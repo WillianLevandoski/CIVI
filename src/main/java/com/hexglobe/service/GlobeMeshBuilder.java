@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 public class GlobeMeshBuilder {
+    private static final double CELL_VERTEX_INSET = 0.78;
 
     private final SphereProjectionService projection;
     private final GoldbergFormula formula;
@@ -146,14 +147,14 @@ public class GlobeMeshBuilder {
                 continue;
             }
 
+            Vector3 center = verts.get(vi);
             List<Vector3> ring = new ArrayList<>();
             for (int fi : faceIndices) {
-                ring.add(centroids.get(fi));
+                ring.add(insetTowardsCenter(center, centroids.get(fi)));
             }
 
-            sortAroundVertex(ring, verts.get(vi));
+            sortAroundVertex(ring, center);
 
-            Vector3 center = verts.get(vi);
             CellType type = faceIndices.size() == 5 ? CellType.PENTAGON : CellType.HEXAGON;
             cells.add(new Cell(cellId++, type, center, ring));
         }
@@ -178,7 +179,7 @@ public class GlobeMeshBuilder {
             return;
         }
         Vector3 normal = center.normalize();
-        Vector3 first = ring.get(0);
+        Vector3 first = ring.get(0).add(center.scale(-1));
         Vector3 proj = first.add(normal.scale(-normal.dot(first)));
         double pLen = proj.length();
         if (pLen < 1e-9) {
@@ -188,10 +189,16 @@ public class GlobeMeshBuilder {
         Vector3 bitangent = normal.cross(tangent).normalize();
 
         ring.sort((a, b) -> {
-            double angA = Math.atan2(a.dot(bitangent), a.dot(tangent));
-            double angB = Math.atan2(b.dot(bitangent), b.dot(tangent));
+            Vector3 localA = a.add(center.scale(-1));
+            Vector3 localB = b.add(center.scale(-1));
+            double angA = Math.atan2(localA.dot(bitangent), localA.dot(tangent));
+            double angB = Math.atan2(localB.dot(bitangent), localB.dot(tangent));
             return Double.compare(angA, angB);
         });
+    }
+
+    private Vector3 insetTowardsCenter(Vector3 center, Vector3 vertex) {
+        return projection.project(center.lerp(vertex, CELL_VERTEX_INSET));
     }
 
     private void connectNeighbors(List<Cell> cells, List<int[]> faces, List<Vector3> verts) {
