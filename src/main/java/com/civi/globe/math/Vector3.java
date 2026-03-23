@@ -45,4 +45,20 @@ public record Vector3(double x, double y, double z) {
     public double distanceTo(Vector3 other) {
         return subtract(other).length();
     }
+
+    public Vector3 midpoint(Vector3 other) {
+        return add(other).scale(0.5d);
+    }
+
+    public String format(int decimals) {
+        return "(%s, %s, %s)".formatted(
+                formatComponent(x, decimals),
+                formatComponent(y, decimals),
+                formatComponent(z, decimals)
+        );
+    }
+
+    private String formatComponent(double value, int decimals) {
+        return String.format("%1$." + decimals + "f", value);
+    }
 }

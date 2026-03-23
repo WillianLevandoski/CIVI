@@ -1,6 +1,7 @@
-package com.civi.globe.core;
+package com.civi.globe.domain;
 
 import com.civi.globe.math.Vector3;
+
 import java.util.List;
 
 public record Cell(
@@ -8,6 +9,10 @@ public record Cell(
         CellType type,
         Vector3 center,
         List<Vector3> vertices,
-        List<String> neighborIds
+        List<String> neighbors
 ) {
+
+    public int sideCount() {
+        return vertices.size();
+    }
 }

@@ -1,6 +1,6 @@
 package com.civi.globe;
 
-import com.civi.globe.ui.GlobeApp;
+import com.civi.globe.app.AppLauncher;
 
 public final class Main {
 
@@ -8,6 +8,6 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        GlobeApp.launch(GlobeApp.class, args);
+        AppLauncher.main(args);
     }
 }
