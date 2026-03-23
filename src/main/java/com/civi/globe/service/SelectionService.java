@@ -27,14 +27,14 @@ public final class SelectionService {
     public void select(Node target) {
         Cell cell = resolveCell(target);
         if (cell == null) {
+            clear();
             return;
         }
-        if (selectedCell != null) {
-            Node current = cellNodes.get(selectedCell.id());
-            if (current != null) {
-                cellNodeFactory.applySelection(current, false);
-            }
+        if (selectedCell != null && selectedCell.id().equals(cell.id())) {
+            clear();
+            return;
         }
+        clearCurrentSelection();
         selectedCell = cell;
         Node selectedNode = cellNodes.get(cell.id());
         if (selectedNode != null) {
@@ -44,14 +44,19 @@ public final class SelectionService {
     }
 
     public void clear() {
-        if (selectedCell != null) {
-            Node current = cellNodes.get(selectedCell.id());
-            if (current != null) {
-                cellNodeFactory.applySelection(current, false);
-            }
+        clearCurrentSelection();
+        hudOverlay.clearSelection();
+    }
+
+    private void clearCurrentSelection() {
+        if (selectedCell == null) {
+            return;
+        }
+        Node current = cellNodes.get(selectedCell.id());
+        if (current != null) {
+            cellNodeFactory.applySelection(current, false);
         }
         selectedCell = null;
-        hudOverlay.clearSelection();
     }
 
     private Cell resolveCell(Node node) {
