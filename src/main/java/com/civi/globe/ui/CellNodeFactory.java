@@ -43,7 +43,9 @@ public final class CellNodeFactory {
         if (!(node instanceof Group group)) {
             return;
         }
-        MeshView fillView = (MeshView) group.getChildren().getFirst();
+        if (group.getChildren().isEmpty() || !(group.getChildren().get(0) instanceof MeshView fillView)) {
+            return;
+        }
         fillView.setMaterial(selected ? WHITE_MATERIAL : BLACK_MATERIAL);
     }
 

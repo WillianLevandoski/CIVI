@@ -59,6 +59,8 @@ public final class GoldbergMeshBuilder {
         List<Vector3> centers = new ArrayList<>();
         int candidateIndex = 0;
         int attempts = Math.max(2000, hexagonCount * 200);
+        int rejectedByPentagons = 0;
+        int rejectedByHexagons = 0;
         while (centers.size() < hexagonCount && candidateIndex < attempts) {
             Vector3 candidate = fibonacciPoint(candidateIndex++, hexagonCount + pentagonCenters.size() + 32);
             double pentagonDistance = pentagonCenters.stream()
@@ -66,18 +68,41 @@ public final class GoldbergMeshBuilder {
                     .min()
                     .orElse(0.0d);
             if (pentagonDistance < PENTAGON_SPACING) {
+                rejectedByPentagons++;
                 continue;
             }
             boolean tooClose = centers.stream().anyMatch(center -> center.distanceTo(candidate) < HEXAGON_SPACING);
             if (tooClose) {
+                rejectedByHexagons++;
                 continue;
             }
             centers.add(candidate);
         }
         if (centers.size() < hexagonCount) {
-            throw new IllegalStateException("Não foi possível distribuir os hexágonos na esfera.");
+            throw new IllegalStateException(buildHexagonDistributionError(
+                    hexagonCount,
+                    centers.size(),
+                    attempts,
+                    rejectedByPentagons,
+                    rejectedByHexagons
+            ));
         }
         return centers;
+    }
+
+    private String buildHexagonDistributionError(
+            int hexagonCount,
+            int generatedHexagons,
+            int attempts,
+            int rejectedByPentagons,
+            int rejectedByHexagons
+    ) {
+        return "Não foi possível distribuir os hexágonos na esfera. "
+                + "Gerados %d de %d hexágonos após %d tentativas. "
+                .formatted(generatedHexagons, hexagonCount, attempts)
+                + "%d candidatos foram rejeitados por ficarem perto demais dos pentágonos (< %.2f) e %d por colisão entre hexágonos (< %.2f). "
+                .formatted(rejectedByPentagons, PENTAGON_SPACING, rejectedByHexagons, HEXAGON_SPACING)
+                + "Isso indica que a malha solicitada ficou densa demais para os espaçamentos fixos atuais e para a amostragem por Fibonacci usada pelo gerador.";
     }
 
     private Vector3 fibonacciPoint(int index, int total) {
