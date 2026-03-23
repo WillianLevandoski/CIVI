@@ -21,7 +21,7 @@ public class CellNodeFactory {
     private static final Color FILL_SELECTED   = Color.color(0.00, 0.25, 0.30, 0.95);
     private static final Color EDGE_DEFAULT    = Color.WHITE;
     private static final Color EDGE_SELECTED   = Color.CYAN;
-    private static final double EDGE_RADIUS    = 0.35;
+    private static final double EDGE_RADIUS    = 0.16;
 
     private final SelectionService selectionService;
 

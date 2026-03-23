@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 
 public class GlobeMeshBuilder {
-
     private final SphereProjectionService projection;
     private final GoldbergFormula formula;
     private final double radius;
