@@ -22,18 +22,18 @@ Os parâmetros `m` e `n` definem a família icosaédrica `GP(m,n)`.
 
 ## Valor padrão adotado
 
-A aplicação agora inicia com `m = 5` e `n = 4`, o que gera `T = 61`.
+A aplicação agora inicia com `m = 1` e `n = 1`, o que gera `T = 3`.
 
-Esse valor foi escolhido por ser o menor `T` estritamente maior que `60`, entregando um ganho visível de detalhe sem pular direto para malhas bem mais pesadas logo na abertura.
+Esse valor reduz drasticamente a quantidade de células renderizadas na abertura, ajudando a diagnosticar problemas de exibição antes de testar malhas mais pesadas.
 
-Para `GP(5,4)`:
+Para `GP(1,1)`:
 
-- `T = 61`
+- `T = 3`
 - pentágonos = `12`
-- hexágonos = `600`
-- faces totais = `612`
-- vértices = `1220`
-- arestas = `1830`
+- hexágonos = `20`
+- faces totais = `32`
+- vértices = `60`
+- arestas = `90`
 
 ## Estado atual
 
