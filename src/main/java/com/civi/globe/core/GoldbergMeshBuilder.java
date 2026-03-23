@@ -12,11 +12,10 @@ import java.util.Set;
 
 public final class GoldbergMeshBuilder {
 
-    private static final double PENTAGON_SPACING = 0.55d;
-    private static final double HEXAGON_SPACING = 0.25d;
-    private static final double PENTAGON_RADIUS = 0.20d;
-    private static final double HEXAGON_RADIUS = 0.16d;
-
+    private static final double BASE_PENTAGON_SPACING = 0.55d;
+    private static final double BASE_HEXAGON_SPACING = 0.25d;
+    private static final double MIN_PENTAGON_SPACING = 0.25d;
+    private static final double MIN_HEXAGON_SPACING = 0.12d;
     private final IcosahedronBuilder icosahedronBuilder = new IcosahedronBuilder();
 
     public GlobeMesh build(int m, int n) {
@@ -56,6 +55,41 @@ public final class GoldbergMeshBuilder {
     }
 
     private List<Vector3> generateHexagonCenters(int hexagonCount, List<Vector3> pentagonCenters) {
+        DistributionAttempt bestAttempt = null;
+        for (int relaxationStep = 0; relaxationStep <= 8; relaxationStep++) {
+            DistributionAttempt attempt = attemptHexagonDistribution(
+                    hexagonCount,
+                    pentagonCenters,
+                    relaxedSpacing(BASE_PENTAGON_SPACING, MIN_PENTAGON_SPACING, relaxationStep, 0.05d),
+                    relaxedSpacing(BASE_HEXAGON_SPACING, MIN_HEXAGON_SPACING, relaxationStep, 0.015d)
+            );
+            if (bestAttempt == null || attempt.generatedHexagons() > bestAttempt.generatedHexagons()) {
+                bestAttempt = attempt;
+            }
+            if (attempt.generatedHexagons() == hexagonCount) {
+                return attempt.centers();
+            }
+        }
+        if (bestAttempt != null) {
+            throw new IllegalStateException(buildHexagonDistributionError(
+                    hexagonCount,
+                    bestAttempt.generatedHexagons(),
+                    bestAttempt.attempts(),
+                    bestAttempt.rejectedByPentagons(),
+                    bestAttempt.rejectedByHexagons(),
+                    bestAttempt.pentagonSpacing(),
+                    bestAttempt.hexagonSpacing()
+            ));
+        }
+        return List.of();
+    }
+
+    private DistributionAttempt attemptHexagonDistribution(
+            int hexagonCount,
+            List<Vector3> pentagonCenters,
+            double pentagonSpacing,
+            double hexagonSpacing
+    ) {
         List<Vector3> centers = new ArrayList<>();
         int candidateIndex = 0;
         int attempts = Math.max(2000, hexagonCount * 200);
@@ -67,27 +101,30 @@ public final class GoldbergMeshBuilder {
                     .mapToDouble(center -> center.distanceTo(candidate))
                     .min()
                     .orElse(0.0d);
-            if (pentagonDistance < PENTAGON_SPACING) {
+            if (pentagonDistance < pentagonSpacing) {
                 rejectedByPentagons++;
                 continue;
             }
-            boolean tooClose = centers.stream().anyMatch(center -> center.distanceTo(candidate) < HEXAGON_SPACING);
+            boolean tooClose = centers.stream().anyMatch(center -> center.distanceTo(candidate) < hexagonSpacing);
             if (tooClose) {
                 rejectedByHexagons++;
                 continue;
             }
             centers.add(candidate);
         }
-        if (centers.size() < hexagonCount) {
-            throw new IllegalStateException(buildHexagonDistributionError(
-                    hexagonCount,
-                    centers.size(),
-                    attempts,
-                    rejectedByPentagons,
-                    rejectedByHexagons
-            ));
-        }
-        return centers;
+        return new DistributionAttempt(
+                List.copyOf(centers),
+                centers.size(),
+                attempts,
+                rejectedByPentagons,
+                rejectedByHexagons,
+                pentagonSpacing,
+                hexagonSpacing
+        );
+    }
+
+    private double relaxedSpacing(double baseSpacing, double minimumSpacing, int relaxationStep, double decrement) {
+        return Math.max(minimumSpacing, baseSpacing - (relaxationStep * decrement));
     }
 
     private String buildHexagonDistributionError(
@@ -95,14 +132,27 @@ public final class GoldbergMeshBuilder {
             int generatedHexagons,
             int attempts,
             int rejectedByPentagons,
-            int rejectedByHexagons
+            int rejectedByHexagons,
+            double pentagonSpacing,
+            double hexagonSpacing
     ) {
         return "Não foi possível distribuir os hexágonos na esfera. "
                 + "Gerados %d de %d hexágonos após %d tentativas. "
                 .formatted(generatedHexagons, hexagonCount, attempts)
                 + "%d candidatos foram rejeitados por ficarem perto demais dos pentágonos (< %.2f) e %d por colisão entre hexágonos (< %.2f). "
-                .formatted(rejectedByPentagons, PENTAGON_SPACING, rejectedByHexagons, HEXAGON_SPACING)
-                + "Isso indica que a malha solicitada ficou densa demais para os espaçamentos fixos atuais e para a amostragem por Fibonacci usada pelo gerador.";
+                .formatted(rejectedByPentagons, pentagonSpacing, rejectedByHexagons, hexagonSpacing)
+                + "Isso indica que a malha solicitada ficou densa demais mesmo após relaxar os espaçamentos e manter a amostragem por Fibonacci.";
+    }
+
+    private record DistributionAttempt(
+            List<Vector3> centers,
+            int generatedHexagons,
+            int attempts,
+            int rejectedByPentagons,
+            int rejectedByHexagons,
+            double pentagonSpacing,
+            double hexagonSpacing
+    ) {
     }
 
     private Vector3 fibonacciPoint(int index, int total) {
@@ -184,16 +234,35 @@ public final class GoldbergMeshBuilder {
 
     private List<Vector3> buildPolygon(Vector3 center, List<Vector3> neighbors, CellType type) {
         int sides = type == CellType.PENTAGON ? 5 : 6;
-        double radius = type == CellType.PENTAGON ? PENTAGON_RADIUS : HEXAGON_RADIUS;
+        if (neighbors.size() < 2) {
+            return buildFallbackPolygon(center, sides);
+        }
+        List<Vector3> vertices = new ArrayList<>();
+        for (int index = 0; index < sides; index++) {
+            Vector3 currentNeighbor = neighbors.get(index % neighbors.size());
+            Vector3 nextNeighbor = neighbors.get((index + 1) % neighbors.size());
+            Vector3 vertex = center
+                    .add(currentNeighbor)
+                    .add(nextNeighbor)
+                    .normalize();
+            if (vertices.stream().noneMatch(existing -> existing.distanceTo(vertex) < 0.0001d)) {
+                vertices.add(vertex);
+            }
+        }
+        if (vertices.size() < 3) {
+            return buildFallbackPolygon(center, sides);
+        }
+        return vertices;
+    }
+
+    private List<Vector3> buildFallbackPolygon(Vector3 center, int sides) {
         Vector3 reference = Math.abs(center.y()) > 0.9d ? new Vector3(1.0d, 0.0d, 0.0d) : new Vector3(0.0d, 1.0d, 0.0d);
         Vector3 tangentA = center.cross(reference).normalize();
         Vector3 tangentB = center.cross(tangentA).normalize();
+        double radius = 0.18d;
         List<Vector3> vertices = new ArrayList<>();
         for (int index = 0; index < sides; index++) {
             double angle = (Math.PI * 2.0d * index) / sides;
-            if (index < neighbors.size()) {
-                angle = angleAround(center, neighbors.get(index));
-            }
             Vector3 vertex = center
                     .add(tangentA.scale(Math.cos(angle) * radius))
                     .add(tangentB.scale(Math.sin(angle) * radius))
