@@ -228,8 +228,16 @@ public final class GlobeApp extends Application {
             selectionLabel.setText("Seleção: nenhuma");
             statsLabel.setText(buildStats(mesh));
         } catch (RuntimeException exception) {
-            selectionLabel.setText("Erro: " + exception.getMessage());
+            selectedCell = null;
+            selectionLabel.setText("Erro ao gerar GP(%d,%d)".formatted(m, n));
+            statsLabel.setText(buildErrorDetails(m, n, exception));
         }
+    }
+
+    private String buildErrorDetails(int m, int n, RuntimeException exception) {
+        int t = GoldbergFormula.computeT(m, n);
+        return "Falha ao gerar a malha GP(%d,%d).\nT = %d\nHexágonos esperados = %d\nDetalhes: %s"
+                .formatted(m, n, t, GoldbergFormula.computeHexagons(t), exception.getMessage());
     }
 
     private String buildStats(GlobeMesh mesh) {
