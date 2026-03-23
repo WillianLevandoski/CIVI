@@ -19,6 +19,22 @@ Os parâmetros `m` e `n` definem a família icosaédrica `GP(m,n)`.
 - vértices = `20 * T`
 - arestas = `30 * T`
 
+
+## Valor padrão adotado
+
+A aplicação agora inicia com `m = 5` e `n = 4`, o que gera `T = 61`.
+
+Esse valor foi escolhido por ser o menor `T` estritamente maior que `60`, entregando um ganho visível de detalhe sem pular direto para malhas bem mais pesadas logo na abertura.
+
+Para `GP(5,4)`:
+
+- `T = 61`
+- pentágonos = `12`
+- hexágonos = `600`
+- faces totais = `612`
+- vértices = `1220`
+- arestas = `1830`
+
 ## Estado atual
 
 Esta entrega implementa a estrutura completa do projeto, as fórmulas clássicas, validação, seleção visual, rotação, zoom e uma malha inicial funcional sobre a esfera.

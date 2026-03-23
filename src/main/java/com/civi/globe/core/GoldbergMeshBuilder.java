@@ -2,6 +2,7 @@ package com.civi.globe.core;
 
 import com.civi.globe.math.Vector3;
 import java.util.ArrayList;
+import java.util.logging.Logger;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -12,6 +13,8 @@ import java.util.Set;
 
 public final class GoldbergMeshBuilder {
 
+    private static final Logger LOGGER = Logger.getLogger(GoldbergMeshBuilder.class.getName());
+
     private final IcosahedronBuilder icosahedronBuilder = new IcosahedronBuilder();
 
     public GlobeMesh build(int m, int n) {
@@ -19,18 +22,23 @@ public final class GoldbergMeshBuilder {
         int t = GoldbergFormula.computeT(m, n);
         int pentagons = GoldbergFormula.computePentagons();
         int hexagons = GoldbergFormula.computeHexagons(t);
+        LOGGER.info(() -> "Construindo malha Goldberg com m=%d, n=%d, T=%d, pentágonos=%d e hexágonos=%d."
+                .formatted(m, n, t, pentagons, hexagons));
 
         List<SeedCell> seeds = new ArrayList<>();
         List<Vector3> pentagonCenters = icosahedronBuilder.createVertices();
+        LOGGER.info(() -> "Vértices base do icosaedro gerados: " + pentagonCenters.size());
         for (int index = 0; index < pentagonCenters.size(); index++) {
             seeds.add(new SeedCell("P-%02d".formatted(index + 1), CellType.PENTAGON, pentagonCenters.get(index)));
         }
 
         List<Vector3> hexagonCenters = generateHexagonCenters(hexagons, pentagonCenters);
+        LOGGER.info(() -> "Centros hexagonais gerados: " + hexagonCenters.size());
         for (int index = 0; index < hexagonCenters.size(); index++) {
             seeds.add(new SeedCell("H-%03d".formatted(index + 1), CellType.HEXAGON, hexagonCenters.get(index)));
         }
 
+        LOGGER.info(() -> "Total de sementes para a malha: " + seeds.size());
         Map<String, Set<String>> neighbors = buildNeighborGraph(seeds);
         List<Cell> cells = seeds.stream()
                 .map(seed -> toCell(seed, neighbors.getOrDefault(seed.id(), Set.of()), seeds))
@@ -38,6 +46,7 @@ public final class GoldbergMeshBuilder {
 
         GlobeMesh mesh = new GlobeMesh(m, n, t, pentagons, hexagons, cells);
         GlobeValidator.validate(mesh);
+        LOGGER.info(() -> "Validação concluída. Células finais: " + cells.size());
         return mesh;
     }
 
@@ -51,6 +60,7 @@ public final class GoldbergMeshBuilder {
     }
 
     private List<Vector3> generateHexagonCenters(int hexagonCount, List<Vector3> pentagonCenters) {
+        LOGGER.info(() -> "Iniciando geração de " + hexagonCount + " centros hexagonais.");
         List<Vector3> centers = new ArrayList<>();
         int index = 0;
         while (centers.size() < hexagonCount) {
@@ -67,6 +77,9 @@ public final class GoldbergMeshBuilder {
                 continue;
             }
             centers.add(candidate);
+            if (centers.size() % 100 == 0 || centers.size() == hexagonCount) {
+                LOGGER.info(() -> "Progresso da geração de hexágonos: " + centers.size() + "/" + hexagonCount);
+            }
         }
         return centers;
     }
