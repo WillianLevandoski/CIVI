@@ -1,71 +1,37 @@
-# Goldberg Globe JavaFX
+# CIVI Goldberg Globe
 
-Projeto Java 21 com Maven e JavaFX 3D que gera uma primeira versão funcional de um globo baseado na família icosaédrica `GP(m,n)`.
+Aplicação Java 21 + Maven + JavaFX 3D que renderiza um globo técnico com células predominantemente hexagonais deformadas sobre uma esfera, inspirada na lógica de Goldberg polyhedra / dual geodésica.
 
-## Como rodar
+## Requisitos
+
+- Java 21
+- Maven 3.9+
+
+## Executar
 
 ```bash
 mvn javafx:run
 ```
 
-## O que significam `m` e `n`
-
-Os parâmetros `m` e `n` controlam a frequência Goldberg:
-
-- `T = m² + m*n + n²`
-- pentágonos = `12`
-- hexágonos = `10 * (T - 1)`
-- faces totais = `10 * T + 2`
-- vértices = `20 * T`
-- arestas = `30 * T`
-
-A aplicação valida `m >= 0`, `n >= 0` e bloqueia `m = 0` com `n = 0`.
-
-## Estado da implementação
-
-A entrega atual já está executável e separada em duas partes:
-
-- núcleo matemático e geração da malha
-- visualização 3D interativa em JavaFX
-
-A geometria usa uma primeira aproximação funcional:
-
-1. posiciona os 12 pentágonos nos vértices normalizados do icosaedro
-2. distribui os hexágonos restantes sobre a esfera
-3. constrói uma vizinhança local
-4. gera polígonos pentagonais e hexagonais tangentes à esfera
-
-Essa base deixa o projeto pronto para evoluir para uma dual geodésica mais precisa sem quebrar a arquitetura.
-
 ## Controles
 
-- mouse drag: rotacionar
-- scroll do mouse: zoom
-- setas do teclado: navegar pelo globo
-- `+` ou `=`: zoom in
+- Mouse drag: rotaciona o globo
+- Scroll: zoom in / zoom out
+- Setas: giram os eixos X e Y
+- `+` / `=`: zoom in
 - `-`: zoom out
-- clique em uma célula: destacar e mostrar ID/tipo
+- `R`: reseta a câmera
+- Clique em uma célula: seleciona e destaca
 
-## Aparência atual
+## Arquitetura
 
-- globo preto
-- linhas das células em branco
-- destaque em preto e branco
+- `app`: bootstrap da aplicação
+- `controller`: cena, câmera e input
+- `domain`: malha, célula e tipos
+- `math`: vetores e fórmula de Goldberg
+- `service`: geração, projeção, validação e seleção
+- `ui`: renderização 3D e HUD mínima
 
-## Exemplo com `m=1` e `n=1`
+## Observações
 
-Para `GP(1,1)`:
-
-- `T = 3`
-- pentágonos = `12`
-- hexágonos = `20`
-- faces totais = `32`
-- vértices = `60`
-- arestas = `90`
-
-Uso:
-
-1. execute `mvn javafx:run`
-2. informe `m = 1` e `n = 1`
-3. clique em **Gerar**
-4. clique em um hexágono para ver o `ID` e o `tipo`
+A versão atual prioriza uma base funcional e extensível: o globo inicia pronto, a navegação funciona, o zoom é limitado, a seleção exibe metadados e a malha já assume 12 regiões especiais de curvatura, com predominância de células hexagonais deformadas.

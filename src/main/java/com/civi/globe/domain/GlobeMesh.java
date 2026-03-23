@@ -1,6 +1,7 @@
-package com.civi.globe.core;
+package com.civi.globe.domain;
 
 import java.util.List;
+import java.util.Map;
 
 public record GlobeMesh(
         int m,
@@ -8,6 +9,7 @@ public record GlobeMesh(
         int t,
         int pentagonCount,
         int hexagonCount,
-        List<Cell> cells
+        List<Cell> cells,
+        Map<String, Cell> cellsById
 ) {
 }
