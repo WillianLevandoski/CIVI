@@ -33,8 +33,8 @@ import java.util.logging.Logger;
 public final class GlobeApp extends Application {
 
     private static final Logger LOGGER = Logger.getLogger(GlobeApp.class.getName());
-    private static final int DEFAULT_M = 5;
-    private static final int DEFAULT_N = 4;
+    private static final int DEFAULT_M = 1;
+    private static final int DEFAULT_N = 1;
 
     private final GoldbergMeshBuilder meshBuilder = new GoldbergMeshBuilder();
     private final CellNodeFactory cellNodeFactory = new CellNodeFactory();
