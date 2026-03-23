@@ -12,7 +12,8 @@ import java.util.List;
 public final class GlobeProjectionService {
 
     private static final int HEX_SIDES = 6;
-    private static final double HEX_RADIUS = 0.16d;
+    private static final double HEX_SIZE_FILL = 0.92d;
+    private static final double PERSPECTIVE_STRENGTH = 0.18d;
 
     public List<ProjectedTile> project(List<HexTile> tiles, CameraState cameraState, Dimension canvasSize) {
         List<ProjectedTile> projectedTiles = new ArrayList<>();
@@ -38,14 +39,30 @@ public final class GlobeProjectionService {
 
     private Polygon createHexPolygon(HexTile tile, CameraState cameraState, double globeRadius, double centerX, double centerY) {
         Polygon polygon = new Polygon();
+        double cosLatitude = Math.max(0.18d, Math.cos(tile.latitude()));
+        double horizontalSpacing = tile.longitudeStep() * cosLatitude;
+        double sideLength = Math.min(horizontalSpacing / Math.sqrt(3.0d), tile.latitudeStep() / 1.5d) * HEX_SIZE_FILL;
+        double halfWidth = (Math.sqrt(3.0d) / 2.0d) * sideLength;
+        double halfHeight = sideLength / 2.0d;
+
+        double[][] cornerOffsets = new double[][]{
+                {0.0d, -sideLength},
+                {halfWidth, -halfHeight},
+                {halfWidth, halfHeight},
+                {0.0d, sideLength},
+                {-halfWidth, halfHeight},
+                {-halfWidth, -halfHeight}
+        };
+
         for (int corner = 0; corner < HEX_SIDES; corner++) {
-            double angle = Math.toRadians(60.0d * corner);
-            double cornerLatitude = tile.latitude() + (HEX_RADIUS * Math.sin(angle));
-            double poleLimit = Math.toRadians(89.0d);
+            double xOffset = cornerOffsets[corner][0];
+            double yOffset = cornerOffsets[corner][1];
+            double cornerLatitude = tile.latitude() + yOffset;
+            double poleLimit = Math.toRadians(88.0d);
             cornerLatitude = Math.max(-poleLimit, Math.min(poleLimit, cornerLatitude));
 
-            double longitudinalScale = Math.max(0.25d, Math.cos(tile.latitude()));
-            double cornerLongitude = tile.longitude() + ((HEX_RADIUS * Math.cos(angle)) / longitudinalScale);
+            double longitudinalScale = Math.max(0.12d, Math.cos(cornerLatitude));
+            double cornerLongitude = tile.longitude() + (xOffset / longitudinalScale);
             Vector3 rotatedCorner = rotate(sphericalToCartesian(cornerLatitude, cornerLongitude), cameraState);
             if (rotatedCorner.z() <= -0.20d) {
                 return new Polygon();
@@ -58,7 +75,7 @@ public final class GlobeProjectionService {
     }
 
     private Point2D projectToScreen(Vector3 point, double globeRadius, double centerX, double centerY) {
-        double perspective = 1.0d + (point.z() * 0.18d);
+        double perspective = 1.0d + (point.z() * PERSPECTIVE_STRENGTH);
         double x = centerX + (point.x() * globeRadius * perspective);
         double y = centerY - (point.y() * globeRadius * perspective);
         return new Point2D.Double(x, y);

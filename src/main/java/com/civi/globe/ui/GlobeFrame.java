@@ -10,7 +10,7 @@ public final class GlobeFrame extends JFrame {
         super("CIVI - Globo Hexagonal");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        add(new GlobePanel(new HexGlobe(16, 24)), BorderLayout.CENTER);
+        add(new GlobePanel(new HexGlobe(28, 42)), BorderLayout.CENTER);
         pack();
         setLocationRelativeTo(null);
     }

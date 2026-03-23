@@ -6,6 +6,8 @@ public record HexTile(
         int column,
         double latitude,
         double longitude,
+        double latitudeStep,
+        double longitudeStep,
         Vector3 center
 ) {
 }
