@@ -3,6 +3,7 @@ package com.civi.globe.ui;
 import com.civi.globe.core.Cell;
 import com.civi.globe.core.CellType;
 import com.civi.globe.math.Vector3;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
@@ -13,12 +14,40 @@ import javafx.scene.shape.TriangleMesh;
 
 public final class CellNodeFactory {
 
-    private static final double RADIUS = 220.0d;
-    private static final PhongMaterial PENTAGON_MATERIAL = new PhongMaterial(Color.web("#f4b942"));
-    private static final PhongMaterial HEXAGON_MATERIAL = new PhongMaterial(Color.web("#4fc3f7"));
-    private static final PhongMaterial SELECTED_MATERIAL = new PhongMaterial(Color.web("#ef5350"));
+    public static final double RADIUS = 220.0d;
+
+    private static final PhongMaterial BLACK_MATERIAL = material(Color.BLACK, Color.WHITE);
+    private static final PhongMaterial WHITE_MATERIAL = material(Color.WHITE, Color.WHITE);
 
     public Node create(Cell cell) {
+        TriangleMesh mesh = createMesh(cell);
+
+        MeshView fillView = new MeshView(mesh);
+        fillView.setCullFace(CullFace.NONE);
+        fillView.setDrawMode(DrawMode.FILL);
+        fillView.setMaterial(BLACK_MATERIAL);
+        fillView.setUserData(cell);
+
+        MeshView lineView = new MeshView(mesh);
+        lineView.setCullFace(CullFace.NONE);
+        lineView.setDrawMode(DrawMode.LINE);
+        lineView.setMaterial(WHITE_MATERIAL);
+        lineView.setMouseTransparent(true);
+
+        Group group = new Group(fillView, lineView);
+        group.setUserData(cell);
+        return group;
+    }
+
+    public void applySelected(Node node, boolean selected) {
+        if (!(node instanceof Group group)) {
+            return;
+        }
+        MeshView fillView = (MeshView) group.getChildren().getFirst();
+        fillView.setMaterial(selected ? WHITE_MATERIAL : BLACK_MATERIAL);
+    }
+
+    private TriangleMesh createMesh(Cell cell) {
         TriangleMesh mesh = new TriangleMesh();
         addPoint(mesh, cell.center());
         for (Vector3 vertex : cell.vertices()) {
@@ -29,26 +58,7 @@ public final class CellNodeFactory {
             mesh.getFaces().addAll(0, 0, index, 0, index + 1, 0);
         }
         mesh.getFaces().addAll(0, 0, cell.vertices().size(), 0, 1, 0);
-
-        MeshView view = new MeshView(mesh);
-        view.setCullFace(CullFace.BACK);
-        view.setDrawMode(DrawMode.FILL);
-        view.setMaterial(defaultMaterial(cell.type()));
-        view.setUserData(cell);
-        return view;
-    }
-
-    public void applySelected(Node node, CellType type, boolean selected) {
-        if (node instanceof MeshView meshView) {
-            meshView.setMaterial(selected ? SELECTED_MATERIAL : defaultMaterial(type));
-        }
-    }
-
-    private PhongMaterial defaultMaterial(CellType type) {
-        if (type == CellType.PENTAGON) {
-            return PENTAGON_MATERIAL;
-        }
-        return HEXAGON_MATERIAL;
+        return mesh;
     }
 
     private void addPoint(TriangleMesh mesh, Vector3 vector) {
@@ -57,5 +67,11 @@ public final class CellNodeFactory {
                 (float) (vector.y() * RADIUS),
                 (float) (vector.z() * RADIUS)
         );
+    }
+
+    private static PhongMaterial material(Color diffuse, Color specular) {
+        PhongMaterial material = new PhongMaterial(diffuse);
+        material.setSpecularColor(specular);
+        return material;
     }
 }

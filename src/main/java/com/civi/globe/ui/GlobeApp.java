@@ -11,36 +11,42 @@ import javafx.scene.AmbientLight;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.PerspectiveCamera;
-import javafx.scene.PointLight;
 import javafx.scene.Scene;
+import javafx.scene.SceneAntialiasing;
 import javafx.scene.SubScene;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.PhongMaterial;
+import javafx.scene.shape.Sphere;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public final class GlobeApp extends Application {
 
-    private static final Logger LOGGER = Logger.getLogger(GlobeApp.class.getName());
     private static final int DEFAULT_M = 1;
     private static final int DEFAULT_N = 1;
+    private static final double CAMERA_MIN_Z = -1400.0d;
+    private static final double CAMERA_MAX_Z = -320.0d;
+    private static final double ROTATION_STEP = 8.0d;
+    private static final double ZOOM_STEP = 70.0d;
 
     private final GoldbergMeshBuilder meshBuilder = new GoldbergMeshBuilder();
     private final CellNodeFactory cellNodeFactory = new CellNodeFactory();
     private final Group root3D = new Group();
+    private final Group globeGroup = new Group();
     private final Rotate rotateX = new Rotate(-20.0d, Rotate.X_AXIS);
-    private final Rotate rotateY = new Rotate(-20.0d, Rotate.Y_AXIS);
+    private final Rotate rotateY = new Rotate(-35.0d, Rotate.Y_AXIS);
     private final Map<String, Node> cellNodes = new LinkedHashMap<>();
     private final Label selectionLabel = new Label("Seleção: nenhuma");
     private final Label statsLabel = new Label();
@@ -56,69 +62,75 @@ public final class GlobeApp extends Application {
 
     @Override
     public void start(Stage stage) {
-        LOGGER.info(() -> "Inicializando a aplicação CIVI com valores padrão GP(%d,%d).".formatted(DEFAULT_M, DEFAULT_N));
         BorderPane layout = new BorderPane();
         layout.setTop(buildToolbar());
         layout.setCenter(buildSubScene());
         layout.setRight(buildInfoPanel());
-        layout.setStyle("-fx-background-color: #10141a;");
+        layout.setStyle("-fx-background-color: black;");
 
-        Scene scene = new Scene(layout, 1400, 900, true);
+        Scene scene = new Scene(layout, 1440, 960, true);
+        configureKeyboard(scene);
+
         stage.setTitle("CIVI - Goldberg Globe");
         stage.setScene(scene);
         stage.show();
 
-        LOGGER.info("Janela principal exibida. Iniciando geração automática da malha padrão.");
         loadMesh(DEFAULT_M, DEFAULT_N);
     }
 
     private HBox buildToolbar() {
-        Label formulaLabel = new Label("m e n definem GP(m,n)");
-        formulaLabel.setTextFill(Color.WHITE);
-        mField.setPrefWidth(70);
-        nField.setPrefWidth(70);
-        javafx.scene.control.Button generateButton = new javafx.scene.control.Button("Gerar");
-        generateButton.setOnAction(event -> {
-            int parsedM = parseInput(mField.getText(), "m");
-            int parsedN = parseInput(nField.getText(), "n");
-            LOGGER.info(() -> "Botão Gerar acionado com m=%d e n=%d.".formatted(parsedM, parsedN));
-            loadMesh(parsedM, parsedN);
-        });
-        HBox toolbar = new HBox(10.0d, new Label("m"), mField, new Label("n"), nField, generateButton, formulaLabel);
+        Label formulaLabel = new Label("Use GP(m,n) e navegue com mouse, setas e +/-");
+        styleLabel(formulaLabel);
+        Label mLabel = new Label("m");
+        Label nLabel = new Label("n");
+        styleLabel(mLabel);
+        styleLabel(nLabel);
+        mField.setPrefWidth(70.0d);
+        nField.setPrefWidth(70.0d);
+        Button generateButton = new Button("Gerar");
+        generateButton.setOnAction(event -> loadMesh(parseInput(mField.getText(), "m"), parseInput(nField.getText(), "n")));
+        HBox toolbar = new HBox(10.0d, mLabel, mField, nLabel, nField, generateButton, formulaLabel);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(12.0d));
-        toolbar.setStyle("-fx-background-color: #1b2430;");
-        toolbar.getChildren().stream().filter(Label.class::isInstance).map(Label.class::cast).forEach(label -> label.setTextFill(Color.WHITE));
+        toolbar.setStyle("-fx-background-color: black; -fx-border-color: white; -fx-border-width: 0 0 1 0;");
         return toolbar;
     }
 
     private VBox buildInfoPanel() {
-        VBox panel = new VBox(10.0d, selectionLabel, statsLabel);
+        Label controlsLabel = new Label("Controles\nMouse: rotacionar e clicar\nSetas: girar\n+ / =: zoom in\n-: zoom out");
+        styleLabel(controlsLabel);
+        statsLabel.setWrapText(true);
+        styleLabel(statsLabel);
+        styleLabel(selectionLabel);
+        VBox panel = new VBox(14.0d, controlsLabel, selectionLabel, statsLabel);
         VBox.setVgrow(statsLabel, Priority.ALWAYS);
         panel.setPadding(new Insets(16.0d));
-        panel.setPrefWidth(320.0d);
-        panel.setStyle("-fx-background-color: #18202a;");
-        selectionLabel.setTextFill(Color.WHITE);
-        statsLabel.setTextFill(Color.web("#d0d7de"));
-        statsLabel.setWrapText(true);
+        panel.setPrefWidth(330.0d);
+        panel.setStyle("-fx-background-color: black; -fx-border-color: white; -fx-border-width: 0 0 0 1;");
         return panel;
     }
 
     private SubScene buildSubScene() {
-        LOGGER.info("Configurando SubScene 3D, câmera e iluminação.");
-        root3D.getTransforms().addAll(rotateX, rotateY);
-        AmbientLight ambientLight = new AmbientLight(Color.color(0.7d, 0.7d, 0.7d));
-        PointLight pointLight = new PointLight(Color.WHITE);
-        pointLight.setTranslateZ(-900.0d);
-        pointLight.setTranslateY(-300.0d);
-        root3D.getChildren().addAll(ambientLight, pointLight);
+        root3D.getChildren().clear();
+        root3D.getTransforms().setAll(rotateX, rotateY);
+        globeGroup.getChildren().clear();
+        root3D.getChildren().add(globeGroup);
 
-        SubScene subScene = new SubScene(root3D, 1080, 900, true, javafx.scene.SceneAntialiasing.BALANCED);
-        subScene.setFill(Color.web("#0b0f14"));
+        AmbientLight ambientLight = new AmbientLight(Color.WHITE);
+        root3D.getChildren().add(ambientLight);
+
+        Sphere baseSphere = new Sphere(CellNodeFactory.RADIUS - 4.0d);
+        PhongMaterial sphereMaterial = new PhongMaterial(Color.BLACK);
+        sphereMaterial.setSpecularColor(Color.gray(0.2d));
+        baseSphere.setMaterial(sphereMaterial);
+        globeGroup.getChildren().add(baseSphere);
+
+        SubScene subScene = new SubScene(root3D, 1100.0d, 960.0d, true, SceneAntialiasing.BALANCED);
+        subScene.setFill(Color.BLACK);
         camera = new PerspectiveCamera(true);
         camera.setNearClip(0.1d);
         camera.setFarClip(5000.0d);
-        camera.setTranslateZ(-900.0d);
+        camera.setTranslateZ(-850.0d);
         subScene.setCamera(camera);
         configureMouse(subScene);
         return subScene;
@@ -130,7 +142,7 @@ public final class GlobeApp extends Application {
             anchorY = event.getSceneY();
             anchorAngleX = rotateX.getAngle();
             anchorAngleY = rotateY.getAngle();
-            if (event.getButton() == MouseButton.PRIMARY && event.getPickResult().getIntersectedNode() != null) {
+            if (event.getButton() == MouseButton.PRIMARY) {
                 selectNode(event.getPickResult().getIntersectedNode());
             }
         });
@@ -138,57 +150,90 @@ public final class GlobeApp extends Application {
             if (event.getButton() != MouseButton.PRIMARY) {
                 return;
             }
-            rotateY.setAngle(anchorAngleY + (event.getSceneX() - anchorX) * 0.35d);
-            rotateX.setAngle(anchorAngleX - (event.getSceneY() - anchorY) * 0.35d);
+            rotateY.setAngle(anchorAngleY + ((event.getSceneX() - anchorX) * 0.35d));
+            rotateX.setAngle(anchorAngleX - ((event.getSceneY() - anchorY) * 0.35d));
         });
-        subScene.setOnScroll(event -> camera.setTranslateZ(camera.getTranslateZ() + event.getDeltaY()));
+        subScene.setOnScroll(event -> adjustZoom(event.getDeltaY() > 0 ? -ZOOM_STEP : ZOOM_STEP));
+    }
+
+    private void configureKeyboard(Scene scene) {
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.UP) {
+                rotateX.setAngle(rotateX.getAngle() - ROTATION_STEP);
+            }
+            if (event.getCode() == KeyCode.DOWN) {
+                rotateX.setAngle(rotateX.getAngle() + ROTATION_STEP);
+            }
+            if (event.getCode() == KeyCode.LEFT) {
+                rotateY.setAngle(rotateY.getAngle() - ROTATION_STEP);
+            }
+            if (event.getCode() == KeyCode.RIGHT) {
+                rotateY.setAngle(rotateY.getAngle() + ROTATION_STEP);
+            }
+            if (event.getCode() == KeyCode.PLUS || event.getCode() == KeyCode.EQUALS) {
+                adjustZoom(-ZOOM_STEP);
+            }
+            if (event.getCode() == KeyCode.MINUS) {
+                adjustZoom(ZOOM_STEP);
+            }
+        });
+    }
+
+    private void adjustZoom(double delta) {
+        double nextValue = camera.getTranslateZ() + delta;
+        if (nextValue < CAMERA_MIN_Z) {
+            nextValue = CAMERA_MIN_Z;
+        }
+        if (nextValue > CAMERA_MAX_Z) {
+            nextValue = CAMERA_MAX_Z;
+        }
+        camera.setTranslateZ(nextValue);
     }
 
     private void selectNode(Node node) {
-        Object data = node.getUserData();
-        if (!(data instanceof Cell cell)) {
-            LOGGER.fine(() -> "Clique ignorado porque o nó não representa uma célula: " + node.getClass().getSimpleName());
+        Cell cell = findCell(node);
+        if (cell == null) {
             return;
         }
         if (selectedCell != null) {
-            cellNodeFactory.applySelected(cellNodes.get(selectedCell.id()), selectedCell.type(), false);
+            cellNodeFactory.applySelected(cellNodes.get(selectedCell.id()), false);
         }
         selectedCell = cell;
-        cellNodeFactory.applySelected(node, cell.type(), true);
-        selectionLabel.setText("Seleção: %s | %s".formatted(cell.id(), cell.type()));
-        LOGGER.info(() -> "Célula selecionada: %s (%s).".formatted(cell.id(), cell.type()));
+        cellNodeFactory.applySelected(cellNodes.get(cell.id()), true);
+        selectionLabel.setText("Seleção\nID: %s\nTipo: %s\nVizinhos: %d".formatted(cell.id(), cell.type(), cell.neighborIds().size()));
+    }
+
+    private Cell findCell(Node node) {
+        Node current = node;
+        while (current != null) {
+            if (current.getUserData() instanceof Cell cell) {
+                return cell;
+            }
+            current = current.getParent();
+        }
+        return null;
     }
 
     private void loadMesh(int m, int n) {
-        long startedAt = System.nanoTime();
-        LOGGER.info(() -> "Iniciando loadMesh para GP(%d,%d).".formatted(m, n));
-        GlobeMesh mesh;
         try {
-            mesh = meshBuilder.build(m, n);
-        } catch (IllegalArgumentException exception) {
-            LOGGER.log(Level.WARNING, "Falha ao gerar malha para m=" + m + " e n=" + n, exception);
+            GlobeMesh mesh = meshBuilder.build(m, n);
+            globeGroup.getChildren().removeIf(node -> node.getUserData() instanceof Cell);
+            cellNodes.clear();
+            for (Cell cell : mesh.cells()) {
+                Node cellNode = cellNodeFactory.create(cell);
+                cellNodes.put(cell.id(), cellNode);
+                globeGroup.getChildren().add(cellNode);
+            }
+            selectedCell = null;
+            selectionLabel.setText("Seleção: nenhuma");
+            statsLabel.setText(buildStats(mesh));
+        } catch (RuntimeException exception) {
             selectionLabel.setText("Erro: " + exception.getMessage());
-            return;
         }
-
-        LOGGER.info(() -> "Malha construída com sucesso: T=%d, células=%d. Preparando nós 3D.".formatted(mesh.t(), mesh.cells().size()));
-        root3D.getChildren().removeIf(node -> node.getUserData() instanceof Cell);
-        cellNodes.clear();
-        for (Cell cell : mesh.cells()) {
-            Node node = cellNodeFactory.create(cell);
-            cellNodes.put(cell.id(), node);
-            root3D.getChildren().add(node);
-        }
-        selectedCell = null;
-        selectionLabel.setText("Seleção: nenhuma");
-        statsLabel.setText(buildStats(mesh));
-        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000L;
-        LOGGER.info(() -> "loadMesh finalizado para GP(%d,%d) em %d ms. Nós renderizados=%d."
-                .formatted(m, n, elapsedMs, cellNodes.size()));
     }
 
     private String buildStats(GlobeMesh mesh) {
-        return "GP(%d,%d)\nT = %d\nPentágonos = %d\nHexágonos = %d\nFaces = %d\nVértices = %d\nArestas = %d\nCélulas geradas = %d"
+        return "GP(%d,%d)\nT = %d\nPentágonos = %d\nHexágonos = %d\nFaces = %d\nVértices = %d\nArestas = %d\nCélulas = %d"
                 .formatted(
                         mesh.m(),
                         mesh.n(),
@@ -202,14 +247,15 @@ public final class GlobeApp extends Application {
                 );
     }
 
-    private int parseInput(String rawValue, String fieldName) {
+    private int parseInput(String value, String fieldName) {
         try {
-            int parsed = Integer.parseInt(rawValue.trim());
-            LOGGER.fine(() -> "Campo " + fieldName + " interpretado como " + parsed + ".");
-            return parsed;
+            return Integer.parseInt(value.trim());
         } catch (NumberFormatException exception) {
-            LOGGER.log(Level.WARNING, "Valor inválido no campo " + fieldName + ": '" + rawValue + "'. Usando 0.", exception);
-            return 0;
+            throw new IllegalArgumentException("Valor inválido para %s.".formatted(fieldName));
         }
+    }
+
+    private void styleLabel(Label label) {
+        label.setTextFill(Color.WHITE);
     }
 }
