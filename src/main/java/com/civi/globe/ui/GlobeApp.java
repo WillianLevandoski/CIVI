@@ -7,9 +7,11 @@ import com.civi.globe.core.GlobeMesh;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.AmbientLight;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.PerspectiveCamera;
+import javafx.scene.PointLight;
 import javafx.scene.Scene;
 import javafx.scene.SubScene;
 import javafx.scene.control.Label;
@@ -20,14 +22,19 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.PointLight;
-import javafx.scene.AmbientLight;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public final class GlobeApp extends Application {
+
+    private static final Logger LOGGER = Logger.getLogger(GlobeApp.class.getName());
+    private static final int DEFAULT_M = 5;
+    private static final int DEFAULT_N = 4;
 
     private final GoldbergMeshBuilder meshBuilder = new GoldbergMeshBuilder();
     private final CellNodeFactory cellNodeFactory = new CellNodeFactory();
@@ -37,8 +44,8 @@ public final class GlobeApp extends Application {
     private final Map<String, Node> cellNodes = new LinkedHashMap<>();
     private final Label selectionLabel = new Label("Seleção: nenhuma");
     private final Label statsLabel = new Label();
-    private final TextField mField = new TextField("1");
-    private final TextField nField = new TextField("1");
+    private final TextField mField = new TextField(String.valueOf(DEFAULT_M));
+    private final TextField nField = new TextField(String.valueOf(DEFAULT_N));
 
     private Cell selectedCell;
     private double anchorX;
@@ -49,6 +56,7 @@ public final class GlobeApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        LOGGER.info(() -> "Inicializando a aplicação CIVI com valores padrão GP(%d,%d).".formatted(DEFAULT_M, DEFAULT_N));
         BorderPane layout = new BorderPane();
         layout.setTop(buildToolbar());
         layout.setCenter(buildSubScene());
@@ -60,7 +68,8 @@ public final class GlobeApp extends Application {
         stage.setScene(scene);
         stage.show();
 
-        loadMesh(1, 1);
+        LOGGER.info("Janela principal exibida. Iniciando geração automática da malha padrão.");
+        loadMesh(DEFAULT_M, DEFAULT_N);
     }
 
     private HBox buildToolbar() {
@@ -69,7 +78,12 @@ public final class GlobeApp extends Application {
         mField.setPrefWidth(70);
         nField.setPrefWidth(70);
         javafx.scene.control.Button generateButton = new javafx.scene.control.Button("Gerar");
-        generateButton.setOnAction(event -> loadMesh(parseInput(mField.getText()), parseInput(nField.getText())));
+        generateButton.setOnAction(event -> {
+            int parsedM = parseInput(mField.getText(), "m");
+            int parsedN = parseInput(nField.getText(), "n");
+            LOGGER.info(() -> "Botão Gerar acionado com m=%d e n=%d.".formatted(parsedM, parsedN));
+            loadMesh(parsedM, parsedN);
+        });
         HBox toolbar = new HBox(10.0d, new Label("m"), mField, new Label("n"), nField, generateButton, formulaLabel);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(12.0d));
@@ -91,6 +105,7 @@ public final class GlobeApp extends Application {
     }
 
     private SubScene buildSubScene() {
+        LOGGER.info("Configurando SubScene 3D, câmera e iluminação.");
         root3D.getTransforms().addAll(rotateX, rotateY);
         AmbientLight ambientLight = new AmbientLight(Color.color(0.7d, 0.7d, 0.7d));
         PointLight pointLight = new PointLight(Color.WHITE);
@@ -132,6 +147,7 @@ public final class GlobeApp extends Application {
     private void selectNode(Node node) {
         Object data = node.getUserData();
         if (!(data instanceof Cell cell)) {
+            LOGGER.fine(() -> "Clique ignorado porque o nó não representa uma célula: " + node.getClass().getSimpleName());
             return;
         }
         if (selectedCell != null) {
@@ -140,16 +156,22 @@ public final class GlobeApp extends Application {
         selectedCell = cell;
         cellNodeFactory.applySelected(node, cell.type(), true);
         selectionLabel.setText("Seleção: %s | %s".formatted(cell.id(), cell.type()));
+        LOGGER.info(() -> "Célula selecionada: %s (%s).".formatted(cell.id(), cell.type()));
     }
 
     private void loadMesh(int m, int n) {
+        long startedAt = System.nanoTime();
+        LOGGER.info(() -> "Iniciando loadMesh para GP(%d,%d).".formatted(m, n));
         GlobeMesh mesh;
         try {
             mesh = meshBuilder.build(m, n);
         } catch (IllegalArgumentException exception) {
+            LOGGER.log(Level.WARNING, "Falha ao gerar malha para m=" + m + " e n=" + n, exception);
             selectionLabel.setText("Erro: " + exception.getMessage());
             return;
         }
+
+        LOGGER.info(() -> "Malha construída com sucesso: T=%d, células=%d. Preparando nós 3D.".formatted(mesh.t(), mesh.cells().size()));
         root3D.getChildren().removeIf(node -> node.getUserData() instanceof Cell);
         cellNodes.clear();
         for (Cell cell : mesh.cells()) {
@@ -160,6 +182,9 @@ public final class GlobeApp extends Application {
         selectedCell = null;
         selectionLabel.setText("Seleção: nenhuma");
         statsLabel.setText(buildStats(mesh));
+        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000L;
+        LOGGER.info(() -> "loadMesh finalizado para GP(%d,%d) em %d ms. Nós renderizados=%d."
+                .formatted(m, n, elapsedMs, cellNodes.size()));
     }
 
     private String buildStats(GlobeMesh mesh) {
@@ -177,10 +202,13 @@ public final class GlobeApp extends Application {
                 );
     }
 
-    private int parseInput(String rawValue) {
+    private int parseInput(String rawValue, String fieldName) {
         try {
-            return Integer.parseInt(rawValue.trim());
+            int parsed = Integer.parseInt(rawValue.trim());
+            LOGGER.fine(() -> "Campo " + fieldName + " interpretado como " + parsed + ".");
+            return parsed;
         } catch (NumberFormatException exception) {
+            LOGGER.log(Level.WARNING, "Valor inválido no campo " + fieldName + ": '" + rawValue + "'. Usando 0.", exception);
             return 0;
         }
     }
