@@ -3,6 +3,7 @@ package com.civi.globe.service;
 import com.civi.globe.domain.Cell;
 import com.civi.globe.domain.CellType;
 import com.civi.globe.domain.GlobeMesh;
+import com.civi.globe.math.GoldbergFormula;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -13,7 +14,7 @@ public final class GlobeValidator {
         validateUniqueIds(mesh);
         validateCounts(mesh);
         validateCenters(mesh);
-        validateNeighbors(mesh);
+        validateTopology(mesh);
     }
 
     private void validateUniqueIds(GlobeMesh mesh) {
@@ -27,12 +28,18 @@ public final class GlobeValidator {
 
     private void validateCounts(GlobeMesh mesh) {
         long pentagons = mesh.cells().stream().filter(cell -> cell.type() == CellType.PENTAGON).count();
-        long others = mesh.cells().stream().filter(cell -> cell.type() != CellType.PENTAGON).count();
+        long otherCells = mesh.cells().size() - pentagons;
+        if (mesh.t() != GoldbergFormula.calculateT(mesh.m(), mesh.n())) {
+            throw new IllegalStateException("Valor T inconsistente.");
+        }
         if (pentagons != mesh.pentagonCount()) {
             throw new IllegalStateException("Quantidade de pentágonos inválida.");
         }
-        if (others != mesh.hexagonCount()) {
+        if (otherCells != mesh.hexagonCount()) {
             throw new IllegalStateException("Quantidade de células não pentagonais inválida.");
+        }
+        if (mesh.cells().size() != GoldbergFormula.faceCount(mesh.t())) {
+            throw new IllegalStateException("Quantidade total de faces inválida.");
         }
     }
 
@@ -45,11 +52,14 @@ public final class GlobeValidator {
         }
     }
 
-    private void validateNeighbors(GlobeMesh mesh) {
+    private void validateTopology(GlobeMesh mesh) {
         for (Cell cell : mesh.cells()) {
             int minimum = cell.type() == CellType.PENTAGON ? 5 : 5;
             if (cell.neighbors().size() < minimum) {
                 throw new IllegalStateException("Conectividade insuficiente para: " + cell.id());
+            }
+            if (cell.sideCount() < 5) {
+                throw new IllegalStateException("Face inválida: " + cell.id());
             }
         }
     }

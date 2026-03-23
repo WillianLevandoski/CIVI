@@ -18,7 +18,7 @@ public final class GoldbergFormula {
     }
 
     public static int faceCount(int t) {
-        return (10 * t) + 2;
+        return pentagonCount() + hexagonCount(t);
     }
 
     public static int vertexCount(int t) {
