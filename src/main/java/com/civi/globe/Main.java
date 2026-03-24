@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class Main extends Application {
+    private static final int BASE_SUBDIVISIONS = 10; // configuração atual (1x)
+    private static final int GLOBE_DETAIL_MULTIPLIER = 5; // altere aqui para aumentar/reduzir densidade
     private static final double KEYBOARD_ROTATION_SPEED = 1.2;
     private static final double MOUSE_DRAG_SENSITIVITY = 0.22;
     private static final double ZOOM_SCROLL_STEP = 0.12;
@@ -45,7 +47,7 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
-        mesh.build(10, 1.5);
+        mesh.build(BASE_SUBDIVISIONS * GLOBE_DETAIL_MULTIPLIER, 1.5);
 
         Canvas canvas = new Canvas(1100, 800);
         StackPane root = new StackPane(canvas);
