@@ -22,9 +22,9 @@ public class Main extends Application {
     private static final int GLOBE_DETAIL_MULTIPLIER = 5; // altere aqui para aumentar/reduzir densidade
     private static final double KEYBOARD_ROTATION_SPEED = 1.2;
     private static final double MOUSE_DRAG_SENSITIVITY = 0.22;
-    private static final double ZOOM_SCROLL_STEP = 0.12;
+    private static final double ZOOM_SCROLL_STEP = 0.18;
     private static final double MIN_ZOOM = 0.45;
-    private static final double MAX_ZOOM = 2.8;
+    private static final double MAX_ZOOM = 4.2;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -171,7 +171,7 @@ public class Main extends Application {
             g.setFill(f.cell.color);
             g.fillPolygon(f.x, f.y, 6);
             g.setStroke(Color.WHITE);
-            g.setLineWidth(1.1);
+            g.setLineWidth(0.7);
             g.strokePolygon(f.x, f.y, 6);
         }
     }
