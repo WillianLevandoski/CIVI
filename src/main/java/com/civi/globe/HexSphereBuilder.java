@@ -3,7 +3,9 @@ package com.civi.globe;
 import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class HexSphereBuilder {
     private static final double DEG = Math.PI / 180.0;
@@ -14,6 +16,7 @@ final class HexSphereBuilder {
 
     void build(int n, double r) {
         cells.clear();
+        points.clear();
 
         double c = Math.cos(60.0 * DEG);
         double s = Math.sin(60.0 * DEG);
@@ -266,15 +269,52 @@ final class HexSphereBuilder {
             h.ix[5] = i0;
             cells.add(copyCell(h));
         }
+
+        assignIdsAndNeighbors();
     }
     
     private static HexCell copyCell(HexCell src) {
         HexCell dst = new HexCell();
+        dst.id = src.id;
         dst.a = src.a;
         dst.b = src.b;
         dst.color = src.color;
         System.arraycopy(src.ix, 0, dst.ix, 0, src.ix.length);
         return dst;
+    }
+
+    private void assignIdsAndNeighbors() {
+        for (int i = 0; i < cells.size(); i++) {
+            HexCell cell = cells.get(i);
+            cell.id = i;
+            cell.neighbors.clear();
+        }
+
+        for (int i = 0; i < cells.size(); i++) {
+            HexCell current = cells.get(i);
+            Set<Integer> currentVertices = uniqueVertexIndexes(current);
+            for (int j = i + 1; j < cells.size(); j++) {
+                HexCell other = cells.get(j);
+                int shared = 0;
+                for (int idx : uniqueVertexIndexes(other)) {
+                    if (currentVertices.contains(idx)) {
+                        shared++;
+                    }
+                }
+                if (shared >= 2) {
+                    current.neighbors.add(other.id);
+                    other.neighbors.add(current.id);
+                }
+            }
+        }
+    }
+
+    private static Set<Integer> uniqueVertexIndexes(HexCell cell) {
+        Set<Integer> vertices = new HashSet<>();
+        for (int ix : cell.ix) {
+            vertices.add(ix);
+        }
+        return vertices;
     }
 
     private static void rotate2d(double ang, Vec3 p) {

@@ -30,6 +30,11 @@ final class PointTable {
         return points.size();
     }
 
+    void clear() {
+        points.clear();
+        index.clear();
+    }
+
     private static String key(double x, double y, double z) {
         long qx = Math.round(x * QUANT);
         long qy = Math.round(y * QUANT);
