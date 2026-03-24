@@ -7,6 +7,10 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
 import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
@@ -50,6 +54,7 @@ public class Main extends Application {
     private final HexSphereBuilder mesh = new HexSphereBuilder();
     private final List<Face2D> renderedFaces = new ArrayList<>();
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
+    private final Image hexTexture = loadTexture("/textures/hex-tile.png");
     private boolean showColoredGrid = false;
 
     @Override
@@ -198,8 +203,12 @@ public class Main extends Application {
         renderedFaces.clear();
         renderedFaces.addAll(faces);
         for (Face2D f : faces) {
-            g.setFill(f.cell.color);
-            g.fillPolygon(f.x, f.y, 6);
+            if (hexTexture != null) {
+                drawTexturedPolygon(g, f.x, f.y, hexTexture);
+            } else {
+                g.setFill(f.cell.color);
+                g.fillPolygon(f.x, f.y, 6);
+            }
             Color strokeColor = Color.BLACK;
             if (showColoredGrid && !Color.BLACK.equals(f.cell.color)) {
                 strokeColor = Color.WHITE;
@@ -251,6 +260,66 @@ public class Main extends Application {
 
     private static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static Image loadTexture(String resourcePath) {
+        var stream = Main.class.getResourceAsStream(resourcePath);
+        if (stream == null) {
+            return null;
+        }
+
+        Image image = new Image(stream);
+        return makeMagentaTransparent(image);
+    }
+
+    private static Image makeMagentaTransparent(Image source) {
+        int width = (int) source.getWidth();
+        int height = (int) source.getHeight();
+        WritableImage out = new WritableImage(width, height);
+        PixelReader reader = source.getPixelReader();
+        PixelWriter writer = out.getPixelWriter();
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                Color pixel = reader.getColor(x, y);
+                if (isMagenta(pixel)) {
+                    writer.setColor(x, y, Color.TRANSPARENT);
+                } else {
+                    writer.setColor(x, y, pixel);
+                }
+            }
+        }
+
+        return out;
+    }
+
+    private static boolean isMagenta(Color pixel) {
+        return pixel.getRed() > 0.70 && pixel.getBlue() > 0.70 && pixel.getGreen() < 0.35;
+    }
+
+    private static void drawTexturedPolygon(GraphicsContext g, double[] x, double[] y, Image image) {
+        double minX = x[0];
+        double maxX = x[0];
+        double minY = y[0];
+        double maxY = y[0];
+
+        for (int i = 1; i < x.length; i++) {
+            minX = Math.min(minX, x[i]);
+            maxX = Math.max(maxX, x[i]);
+            minY = Math.min(minY, y[i]);
+            maxY = Math.max(maxY, y[i]);
+        }
+
+        g.save();
+        g.beginPath();
+        g.moveTo(x[0], y[0]);
+        for (int i = 1; i < x.length; i++) {
+            g.lineTo(x[i], y[i]);
+        }
+        g.closePath();
+        g.clip();
+        g.drawImage(image, minX, minY, maxX - minX, maxY - minY);
+        g.restore();
     }
 
     private record Face2D(double[] x, double[] y, double z, HexCell cell) {}
