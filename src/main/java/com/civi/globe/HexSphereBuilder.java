@@ -62,7 +62,8 @@ final class HexSphereBuilder {
         }
 
         h.color = Color.rgb(0, 64, 64);
-        for (double ang = 72.0 * DEG, a = 1; a < 5; a++, ang += 72.0 * DEG) {
+        for (int sector = 1; sector < 5; sector++) {
+            double ang = sector * 72.0 * DEG;
             for (int i = 0; i < firstTriangleCount; i++) {
                 HexCell ph = cells.get(i);
                 for (int j = 0; j < 6; j++) {
@@ -70,12 +71,11 @@ final class HexSphereBuilder {
                     rotate2d(-ang, p);
                     h.ix[j] = points.add(p.x, p.y, p.z);
                 }
-                h.a = ph.a + (a * (n - 2));
+                h.a = ph.a + (sector * (n - 2));
                 h.b = ph.b;
                 cells.add(copyCell(h));
             }
         }
-
         for (int i = 0; i < points.size(); i++) {
             Vec3 q = points.get(i);
             double ang = len(q.x, q.y, q.z) * 0.5 * Math.PI / r;
@@ -205,23 +205,33 @@ final class HexSphereBuilder {
             }
         }
 
-        for (double ang = 36.0 * DEG, a = 0; a < na; a += n - 2, ang -= 72.0 * DEG) {
+        for (int sectorBase = 0; sectorBase < na; sectorBase += (n - 2)) {
+            double ang = 36.0 * DEG - ((sectorBase / (n - 2)) * 72.0 * DEG);
+
             double px = r * Math.cos(ang);
             double py = r * Math.sin(ang);
             double z = sz;
+
             int i0 = points.add(px, py, +z);
             int i1 = points.add(px, py, -z);
-            int a0 = a - 1;
-            if (a0 < 0) a0 += na;
-            int a1 = a + 1;
-            if (a1 >= na) a1 -= na;
-            ii[0] = ab[a0][b0 - 1];
-            ii[2] = ab[a1][b0 - 1];
-            ii[1] = ab[a0][b0 + 1];
-            ii[3] = ab[a1][b0 + 1];
+
+            int left = sectorBase - (n - 2);
+            if (left < 0) left += na;
+
+            int right = sectorBase + (n - 2);
+            if (right >= na) right -= na;
+
+            ii[0] = ab[left][b0 - 1];
+            ii[1] = ab[left][b0 + 1];
+            ii[2] = ab[right][b0 - 1];
+            ii[3] = ab[right][b0 + 1];
+
+            if (ii[0] < 0 || ii[1] < 0 || ii[2] < 0 || ii[3] < 0) {
+                continue;
+            }
 
             h.color = Color.rgb(128, 128, 0);
-            h.a = a;
+            h.a = sectorBase;
             h.b = 0;
             h.ix[0] = cells.get(ii[0]).ix[0];
             h.ix[1] = cells.get(ii[0]).ix[1];
@@ -257,7 +267,7 @@ final class HexSphereBuilder {
             cells.add(copyCell(h));
         }
     }
-
+    
     private static HexCell copyCell(HexCell src) {
         HexCell dst = new HexCell();
         dst.a = src.a;
