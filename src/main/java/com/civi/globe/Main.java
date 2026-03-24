@@ -5,7 +5,9 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -13,6 +15,7 @@ import javafx.stage.Stage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Main extends Application {
     private static final double KEYBOARD_ROTATION_SPEED = 1.2;
@@ -37,6 +40,8 @@ public class Main extends Application {
     private boolean rightPressed = false;
 
     private final HexSphereBuilder mesh = new HexSphereBuilder();
+    private final List<Face2D> renderedFaces = new ArrayList<>();
+    private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
 
     @Override
     public void start(Stage stage) {
@@ -44,7 +49,18 @@ public class Main extends Application {
 
         Canvas canvas = new Canvas(1100, 800);
         StackPane root = new StackPane(canvas);
-        Scene scene = new Scene(root, 1100, 800, Color.rgb(18, 18, 18));
+        BorderPane layout = new BorderPane();
+        layout.setCenter(root);
+
+        selectedInfoLabel.setWrapText(true);
+        selectedInfoLabel.setTextFill(Color.WHITE);
+        selectedInfoLabel.setMinWidth(280);
+        selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
+        StackPane rightPane = new StackPane(selectedInfoLabel);
+        rightPane.setStyle("-fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
+        layout.setRight(rightPane);
+
+        Scene scene = new Scene(layout, 1400, 800, Color.rgb(18, 18, 18));
 
         canvas.widthProperty().bind(root.widthProperty());
         canvas.heightProperty().bind(root.heightProperty());
@@ -79,6 +95,20 @@ public class Main extends Application {
             double direction = e.getDeltaY() > 0 ? 1.0 : -1.0;
             zoom += direction * ZOOM_SCROLL_STEP;
             zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+        });
+
+        canvas.setOnMouseClicked(e -> {
+            HexCell clickedCell = findCellAt(e.getX(), e.getY());
+            if (clickedCell == null) {
+                selectedInfoLabel.setText("Nenhum hexágono selecionado.");
+                return;
+            }
+
+            String neighbors = clickedCell.neighbors.stream()
+                    .sorted()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+            selectedInfoLabel.setText("ID: " + clickedCell.id + "\nVizinhos: " + neighbors);
         });
 
         new AnimationTimer() {
@@ -129,17 +159,41 @@ public class Main extends Application {
                 xs[i] = (pr.x * k) + (w * 0.5);
                 ys[i] = (-pr.y * k) + (h * 0.5);
             }
-            faces.add(new Face2D(xs, ys, zAcc / 6.0, c.color));
+            faces.add(new Face2D(xs, ys, zAcc / 6.0, c));
         }
 
         faces.sort(Comparator.comparingDouble(a -> a.z));
+        renderedFaces.clear();
+        renderedFaces.addAll(faces);
         for (Face2D f : faces) {
-            g.setFill(f.color);
+            g.setFill(f.cell.color);
             g.fillPolygon(f.x, f.y, 6);
             g.setStroke(Color.WHITE);
             g.setLineWidth(1.1);
             g.strokePolygon(f.x, f.y, 6);
         }
+    }
+
+    private HexCell findCellAt(double x, double y) {
+        for (int i = renderedFaces.size() - 1; i >= 0; i--) {
+            Face2D face = renderedFaces.get(i);
+            if (pointInPolygon(x, y, face.x, face.y)) {
+                return face.cell;
+            }
+        }
+        return null;
+    }
+
+    private static boolean pointInPolygon(double x, double y, double[] px, double[] py) {
+        boolean inside = false;
+        for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
+            boolean intersects = ((py[i] > y) != (py[j] > y))
+                    && (x < ((px[j] - px[i]) * (y - py[i]) / (py[j] - py[i]) + px[i]));
+            if (intersects) {
+                inside = !inside;
+            }
+        }
+        return inside;
     }
 
     private static Vec3 rotate(Vec3 p, double ax, double ay) {
@@ -162,7 +216,7 @@ public class Main extends Application {
         return Math.max(min, Math.min(max, value));
     }
 
-    private record Face2D(double[] x, double[] y, double z, Color color) {}
+    private record Face2D(double[] x, double[] y, double z, HexCell cell) {}
 
     public static void main(String[] args) {
         launch(args);

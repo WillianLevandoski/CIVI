@@ -3,7 +3,12 @@ package com.civi.globe;
 import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 final class HexSphereBuilder {
     private static final double DEG = Math.PI / 180.0;
@@ -14,6 +19,7 @@ final class HexSphereBuilder {
 
     void build(int n, double r) {
         cells.clear();
+        points.clear();
 
         double c = Math.cos(60.0 * DEG);
         double s = Math.sin(60.0 * DEG);
@@ -266,15 +272,171 @@ final class HexSphereBuilder {
             h.ix[5] = i0;
             cells.add(copyCell(h));
         }
+
+        fillBoundaryHoles();
+        assignIdsAndNeighbors();
     }
     
     private static HexCell copyCell(HexCell src) {
         HexCell dst = new HexCell();
+        dst.id = src.id;
         dst.a = src.a;
         dst.b = src.b;
         dst.color = src.color;
         System.arraycopy(src.ix, 0, dst.ix, 0, src.ix.length);
         return dst;
+    }
+
+    private void assignIdsAndNeighbors() {
+        for (int i = 0; i < cells.size(); i++) {
+            HexCell cell = cells.get(i);
+            cell.id = i;
+            cell.neighbors.clear();
+        }
+
+        for (int i = 0; i < cells.size(); i++) {
+            HexCell current = cells.get(i);
+            Set<Integer> currentVertices = uniqueVertexIndexes(current);
+            for (int j = i + 1; j < cells.size(); j++) {
+                HexCell other = cells.get(j);
+                int shared = 0;
+                for (int idx : uniqueVertexIndexes(other)) {
+                    if (currentVertices.contains(idx)) {
+                        shared++;
+                    }
+                }
+                if (shared >= 2) {
+                    current.neighbors.add(other.id);
+                    other.neighbors.add(current.id);
+                }
+            }
+        }
+    }
+
+    private static Set<Integer> uniqueVertexIndexes(HexCell cell) {
+        Set<Integer> vertices = new HashSet<>();
+        for (int ix : cell.ix) {
+            vertices.add(ix);
+        }
+        return vertices;
+    }
+
+    private void fillBoundaryHoles() {
+        Map<EdgeKey, Integer> edgeUseCount = new HashMap<>();
+        for (HexCell cell : cells) {
+            for (int i = 0; i < cell.ix.length; i++) {
+                int from = cell.ix[i];
+                int to = cell.ix[(i + 1) % cell.ix.length];
+                if (from == to) {
+                    continue;
+                }
+                EdgeKey key = EdgeKey.undirected(from, to);
+                edgeUseCount.merge(key, 1, Integer::sum);
+            }
+        }
+
+        Map<Integer, List<Integer>> boundaryGraph = new TreeMap<>();
+        for (Map.Entry<EdgeKey, Integer> entry : edgeUseCount.entrySet()) {
+            if (entry.getValue() != 1) {
+                continue;
+            }
+            int a = entry.getKey().a;
+            int b = entry.getKey().b;
+            boundaryGraph.computeIfAbsent(a, k -> new ArrayList<>()).add(b);
+            boundaryGraph.computeIfAbsent(b, k -> new ArrayList<>()).add(a);
+        }
+        for (List<Integer> neighbors : boundaryGraph.values()) {
+            neighbors.sort(Integer::compareTo);
+        }
+
+        Set<EdgeKey> visitedBoundaryEdges = new HashSet<>();
+        for (Map.Entry<Integer, List<Integer>> entry : boundaryGraph.entrySet()) {
+            int start = entry.getKey();
+            for (int next : entry.getValue()) {
+                EdgeKey firstEdge = EdgeKey.undirected(start, next);
+                if (visitedBoundaryEdges.contains(firstEdge)) {
+                    continue;
+                }
+                List<Integer> loop = traceBoundaryLoop(boundaryGraph, start, next, visitedBoundaryEdges);
+                if (loop.size() >= 3) {
+                    addHolePatch(loop);
+                }
+            }
+        }
+    }
+
+    private List<Integer> traceBoundaryLoop(
+            Map<Integer, List<Integer>> boundaryGraph,
+            int start,
+            int firstNext,
+            Set<EdgeKey> visitedBoundaryEdges
+    ) {
+        List<Integer> loop = new ArrayList<>();
+        int prev = start;
+        int current = firstNext;
+        loop.add(start);
+
+        while (true) {
+            loop.add(current);
+            visitedBoundaryEdges.add(EdgeKey.undirected(prev, current));
+            List<Integer> neighbors = boundaryGraph.get(current);
+            if (neighbors == null || neighbors.size() < 2) {
+                break;
+            }
+            int next = neighbors.get(0) == prev ? neighbors.get(1) : neighbors.get(0);
+            if (next == start) {
+                visitedBoundaryEdges.add(EdgeKey.undirected(current, start));
+                break;
+            }
+            prev = current;
+            current = next;
+        }
+        return loop;
+    }
+
+    private void addHolePatch(List<Integer> loop) {
+        Vec3 centroid = new Vec3(0.0, 0.0, 0.0);
+        for (int ix : loop) {
+            Vec3 p = points.get(ix);
+            centroid.x += p.x;
+            centroid.y += p.y;
+            centroid.z += p.z;
+        }
+        centroid.x /= loop.size();
+        centroid.y /= loop.size();
+        centroid.z /= loop.size();
+
+        double targetRadius = len(points.get(loop.get(0)).x, points.get(loop.get(0)).y, points.get(loop.get(0)).z);
+        double centroidLen = len(centroid.x, centroid.y, centroid.z);
+        if (centroidLen > 0.0) {
+            double scale = targetRadius / centroidLen;
+            centroid.x *= scale;
+            centroid.y *= scale;
+            centroid.z *= scale;
+        }
+
+        int centerIx = points.add(centroid.x, centroid.y, centroid.z);
+        for (int i = 0; i < loop.size(); i++) {
+            int v0 = loop.get(i);
+            int v1 = loop.get((i + 1) % loop.size());
+            HexCell patch = new HexCell();
+            patch.color = Color.rgb(32, 96, 32);
+            patch.a = 0;
+            patch.b = 0;
+            patch.ix[0] = v0;
+            patch.ix[1] = v1;
+            patch.ix[2] = centerIx;
+            patch.ix[3] = centerIx;
+            patch.ix[4] = centerIx;
+            patch.ix[5] = centerIx;
+            cells.add(patch);
+        }
+    }
+
+    private record EdgeKey(int a, int b) {
+        static EdgeKey undirected(int x, int y) {
+            return (x < y) ? new EdgeKey(x, y) : new EdgeKey(y, x);
+        }
     }
 
     private static void rotate2d(double ang, Vec3 p) {
