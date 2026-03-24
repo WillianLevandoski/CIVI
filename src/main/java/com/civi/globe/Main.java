@@ -1,55 +1,108 @@
 package com.civi.globe;
 
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
-import javafx.scene.AmbientLight;
-import javafx.scene.Group;
-import javafx.scene.PerspectiveCamera;
 import javafx.scene.Scene;
-import javafx.scene.SceneAntialiasing;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
-import javafx.scene.PointLight;
-import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
-public final class Main extends Application {
-    private static final double SPHERE_RADIUS = 260.0;
-    private static final int RESOLUTION = 10;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+public class Main extends Application {
+    private double animX = 0.0;
+    private double animY = 0.0;
+    private double dAnimX = 0.0;
+    private double dAnimY = 0.0;
+
+    private final HexSphereBuilder mesh = new HexSphereBuilder();
 
     @Override
     public void start(Stage stage) {
-        GlobeMeshBuilder meshBuilder = new GlobeMeshBuilder();
-        GlobeMesh globeMesh = meshBuilder.build(SPHERE_RADIUS, RESOLUTION);
+        mesh.build(10, 1.5);
 
-        Group root3D = new Group();
-        Group globeRoot = new Group(globeMesh.fillGroup(), globeMesh.edgeGroup());
-        Rotate rotateX = new Rotate(-22.0, Rotate.X_AXIS);
-        Rotate rotateY = new Rotate(-30.0, Rotate.Y_AXIS);
-        Rotate rotateZ = new Rotate(0.0, Rotate.Z_AXIS);
-        globeRoot.getTransforms().addAll(rotateX, rotateY, rotateZ);
-        root3D.getChildren().add(globeRoot);
+        Canvas canvas = new Canvas(1100, 800);
+        StackPane root = new StackPane(canvas);
+        Scene scene = new Scene(root, 1100, 800, Color.rgb(18, 18, 18));
 
-        AmbientLight ambientLight = new AmbientLight(Color.color(0.55, 0.55, 0.55));
-        PointLight light = new PointLight(Color.WHITE);
-        light.setTranslateZ(-600.0);
-        light.setTranslateY(-250.0);
-        root3D.getChildren().addAll(ambientLight, light);
+        canvas.widthProperty().bind(root.widthProperty());
+        canvas.heightProperty().bind(root.heightProperty());
 
-        PerspectiveCamera camera = new PerspectiveCamera(true);
-        camera.setNearClip(0.1);
-        camera.setFarClip(5000.0);
-        CameraController cameraController = new CameraController(camera, rotateX, rotateY, rotateZ, -900.0);
+        scene.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.DOWN) animX += 2.0;
+            if (e.getCode() == KeyCode.UP) animX -= 2.0;
+            if (e.getCode() == KeyCode.RIGHT) animY += 2.0;
+            if (e.getCode() == KeyCode.LEFT) animY -= 2.0;
+        });
 
-        Scene scene = new Scene(root3D, 1400, 900, true, SceneAntialiasing.BALANCED);
-        scene.setFill(Color.BLACK);
-        scene.setCamera(camera);
+        new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                animX = (animX + dAnimX) % 360.0;
+                animY = (animY + dAnimY) % 360.0;
+                draw(canvas.getGraphicsContext2D(), canvas.getWidth(), canvas.getHeight());
+            }
+        }.start();
 
-        InputController inputController = new InputController();
-        inputController.attach(scene, cameraController);
-
-        stage.setTitle("Icosahedral Hex Globe");
+        stage.setTitle("Hex Sphere (Java port)");
         stage.setScene(scene);
         stage.show();
+        scene.getRoot().requestFocus();
     }
+
+    private void draw(GraphicsContext g, double w, double h) {
+        g.setFill(Color.rgb(12, 12, 12));
+        g.fillRect(0, 0, w, h);
+
+        List<Face2D> faces = new ArrayList<>();
+        for (HexCell c : mesh.cells) {
+            double[] xs = new double[6];
+            double[] ys = new double[6];
+            double zAcc = 0.0;
+            for (int i = 0; i < 6; i++) {
+                Vec3 p = mesh.points.get(c.ix[i]);
+                Vec3 pr = rotate(p, animX, animY);
+                zAcc += pr.z;
+                double depth = pr.z + 5.0;
+                double k = 360.0 / depth;
+                xs[i] = (pr.x * k) + (w * 0.5);
+                ys[i] = (-pr.y * k) + (h * 0.5);
+            }
+            faces.add(new Face2D(xs, ys, zAcc / 6.0, c.color));
+        }
+
+        faces.sort(Comparator.comparingDouble(a -> a.z));
+        for (Face2D f : faces) {
+            g.setFill(f.color);
+            g.fillPolygon(f.x, f.y, 6);
+            g.setStroke(Color.WHITE);
+            g.setLineWidth(1.1);
+            g.strokePolygon(f.x, f.y, 6);
+        }
+    }
+
+    private static Vec3 rotate(Vec3 p, double ax, double ay) {
+        double rx = Math.toRadians(ax);
+        double ry = Math.toRadians(ay);
+
+        double cy = Math.cos(ry);
+        double sy = Math.sin(ry);
+        double x1 = (p.x * cy) + (p.z * sy);
+        double z1 = (-p.x * sy) + (p.z * cy);
+
+        double cx = Math.cos(rx);
+        double sx = Math.sin(rx);
+        double y2 = (p.y * cx) - (z1 * sx);
+        double z2 = (p.y * sx) + (z1 * cx);
+        return new Vec3(x1, y2, z2);
+    }
+
+    private record Face2D(double[] x, double[] y, double z, Color color) {}
 
     public static void main(String[] args) {
         launch(args);
