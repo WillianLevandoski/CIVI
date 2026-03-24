@@ -107,8 +107,6 @@ public class Main extends Application {
                 return;
             }
 
-            clickedCell.color = PERMANENT_NEIGHBOR_COLOR;
-
             for (Integer neighborId : clickedCell.neighbors) {
                 if (neighborId >= 0 && neighborId < mesh.cells.size()) {
                     mesh.cells.get(neighborId).color = PERMANENT_NEIGHBOR_COLOR;
