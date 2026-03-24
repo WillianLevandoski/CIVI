@@ -218,10 +218,10 @@ final class HexSphereBuilder {
             int i0 = points.add(px, py, +z);
             int i1 = points.add(px, py, -z);
 
-            int left = sectorBase - (n - 2);
+            int left = sectorBase - 1;
             if (left < 0) left += na;
 
-            int right = sectorBase + (n - 2);
+            int right = sectorBase + 1;
             if (right >= na) right -= na;
 
             ii[0] = ab[left][b0 - 1];
