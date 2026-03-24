@@ -15,10 +15,26 @@ import java.util.Comparator;
 import java.util.List;
 
 public class Main extends Application {
+    private static final double KEYBOARD_ROTATION_SPEED = 1.2;
+    private static final double MOUSE_DRAG_SENSITIVITY = 0.22;
+    private static final double ZOOM_SCROLL_STEP = 0.12;
+    private static final double MIN_ZOOM = 0.45;
+    private static final double MAX_ZOOM = 2.8;
+
     private double animX = 0.0;
     private double animY = 0.0;
     private double dAnimX = 0.0;
     private double dAnimY = 0.0;
+    private double zoom = 1.0;
+
+    private double lastMouseX = 0.0;
+    private double lastMouseY = 0.0;
+    private boolean dragging = false;
+
+    private boolean upPressed = false;
+    private boolean downPressed = false;
+    private boolean leftPressed = false;
+    private boolean rightPressed = false;
 
     private final HexSphereBuilder mesh = new HexSphereBuilder();
 
@@ -33,11 +49,36 @@ public class Main extends Application {
         canvas.widthProperty().bind(root.widthProperty());
         canvas.heightProperty().bind(root.heightProperty());
 
-        scene.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.DOWN) animX += 2.0;
-            if (e.getCode() == KeyCode.UP) animX -= 2.0;
-            if (e.getCode() == KeyCode.RIGHT) animY += 2.0;
-            if (e.getCode() == KeyCode.LEFT) animY -= 2.0;
+        scene.setOnKeyPressed(e -> updateKeyboardRotation(e.getCode(), true));
+        scene.setOnKeyReleased(e -> updateKeyboardRotation(e.getCode(), false));
+
+        canvas.setOnMousePressed(e -> {
+            dragging = true;
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+        });
+
+        canvas.setOnMouseReleased(e -> dragging = false);
+
+        canvas.setOnMouseDragged(e -> {
+            if (!dragging) {
+                return;
+            }
+
+            double dx = e.getX() - lastMouseX;
+            double dy = e.getY() - lastMouseY;
+
+            animY += dx * MOUSE_DRAG_SENSITIVITY;
+            animX -= dy * MOUSE_DRAG_SENSITIVITY;
+
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+        });
+
+        canvas.setOnScroll(e -> {
+            double direction = e.getDeltaY() > 0 ? 1.0 : -1.0;
+            zoom += direction * ZOOM_SCROLL_STEP;
+            zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
         });
 
         new AnimationTimer() {
@@ -55,6 +96,21 @@ public class Main extends Application {
         scene.getRoot().requestFocus();
     }
 
+    private void updateKeyboardRotation(KeyCode keyCode, boolean pressed) {
+        if (keyCode == KeyCode.UP) upPressed = pressed;
+        if (keyCode == KeyCode.DOWN) downPressed = pressed;
+        if (keyCode == KeyCode.LEFT) leftPressed = pressed;
+        if (keyCode == KeyCode.RIGHT) rightPressed = pressed;
+
+        dAnimX = 0.0;
+        dAnimY = 0.0;
+
+        if (upPressed && !downPressed) dAnimX = -KEYBOARD_ROTATION_SPEED;
+        if (downPressed && !upPressed) dAnimX = KEYBOARD_ROTATION_SPEED;
+        if (leftPressed && !rightPressed) dAnimY = -KEYBOARD_ROTATION_SPEED;
+        if (rightPressed && !leftPressed) dAnimY = KEYBOARD_ROTATION_SPEED;
+    }
+
     private void draw(GraphicsContext g, double w, double h) {
         g.setFill(Color.rgb(12, 12, 12));
         g.fillRect(0, 0, w, h);
@@ -69,7 +125,7 @@ public class Main extends Application {
                 Vec3 pr = rotate(p, animX, animY);
                 zAcc += pr.z;
                 double depth = pr.z + 5.0;
-                double k = 360.0 / depth;
+                double k = (360.0 * zoom) / depth;
                 xs[i] = (pr.x * k) + (w * 0.5);
                 ys[i] = (-pr.y * k) + (h * 0.5);
             }
@@ -100,6 +156,10 @@ public class Main extends Application {
         double y2 = (p.y * cx) - (z1 * sx);
         double z2 = (p.y * sx) + (z1 * cx);
         return new Vec3(x1, y2, z2);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private record Face2D(double[] x, double[] y, double z, Color color) {}
