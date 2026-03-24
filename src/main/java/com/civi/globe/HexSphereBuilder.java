@@ -62,8 +62,8 @@ final class HexSphereBuilder {
         }
 
         h.color = new Color(0, 64, 64);
-        for (double ang = 72.0 * DEG, ai = 1; ai < 5; ai++, ang += 72.0 * DEG) {
-            int a = (int) ai;
+        for (int a = 1; a < 5; a++) {
+            double ang = a * 72.0 * DEG;
             for (int i = 0; i < firstTriangleCount; i++) {
                 HexCell ph = cells.get(i);
                 for (int j = 0; j < 6; j++) {

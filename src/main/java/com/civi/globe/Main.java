@@ -21,6 +21,7 @@ public class Main {
     private double dAnimX = 0.0;
     private double dAnimY = 0.0;
 
+    private static final int FPS_DELAY_MS = 16;
     private final HexSphereBuilder mesh = new HexSphereBuilder();
     private final JPanel panel;
 
@@ -55,7 +56,7 @@ public class Main {
         frame.setVisible(true);
         panel.requestFocusInWindow();
 
-        Timer timer = new Timer(16, e -> {
+        Timer timer = new Timer(FPS_DELAY_MS, e -> {
             animX = (animX + dAnimX) % 360.0;
             animY = (animY + dAnimY) % 360.0;
             panel.repaint();

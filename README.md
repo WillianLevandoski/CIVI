@@ -28,3 +28,7 @@ java -cp target/classes com.civi.globe.Main
 - `PointTable.java`: tabela de pontos com deduplicação.
 - `HexCell.java`: célula hexagonal/pentagonal (6 índices, último duplicado para pentágonos).
 - `Vec3.java`: vetor 3D simples.
+
+## Nota sobre conflitos de merge
+
+Se houver conflito nos arquivos `README.md`, `Main.java`, `HexSphereBuilder.java` e `HexCell.java`, mantenha a versão Swing/AWT (sem imports `javafx.*` e sem `module-info.java`).
