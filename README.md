@@ -20,6 +20,14 @@ mvn javafx:run
 - `↑` / `↓`: inclinar em X
 - `←` / `→`: girar em Y
 
+## Textura por hexágono
+
+- O renderer aplica uma textura em cada hexágono usando o arquivo:
+  - `src/main/resources/textures/hex-tile.png`
+- O fundo rosa/magenta da textura é removido automaticamente (chroma key) durante o carregamento.
+- A imagem é esticada para caber no hexágono e é recortada pelo contorno do polígono, sem vazar para os vizinhos.
+- Se o arquivo não existir, o app faz fallback para o preenchimento por cor.
+
 ## Estrutura
 
 - `Main.java`: app JavaFX + renderização 2D em perspectiva.
