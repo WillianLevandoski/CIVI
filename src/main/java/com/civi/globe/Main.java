@@ -19,12 +19,12 @@ import java.util.stream.Collectors;
 
 public class Main extends Application {
     private static final int BASE_SUBDIVISIONS = 10; // configuração atual (1x)
-    private static final int GLOBE_DETAIL_MULTIPLIER = 5; // altere aqui para aumentar/reduzir densidade
-    private static final double KEYBOARD_ROTATION_SPEED = 1.2;
-    private static final double MOUSE_DRAG_SENSITIVITY = 0.22;
-    private static final double ZOOM_SCROLL_STEP = 0.18;
-    private static final double MIN_ZOOM = 0.45;
-    private static final double MAX_ZOOM = 4.2;
+    private static final int GLOBE_DETAIL_MULTIPLIER = 2; // altere aqui para aumentar/reduzir densidade
+    private static final double KEYBOARD_ROTATION_SPEED = 0.5;
+    private static final double MOUSE_DRAG_SENSITIVITY = 0.50;
+    private static final double ZOOM_SCROLL_STEP = 0.50;
+    private static final double MIN_ZOOM = 10.50;
+    private static final double MAX_ZOOM = 30.2;
 
     private double animX = 0.0;
     private double animY = 0.0;
