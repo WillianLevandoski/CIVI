@@ -271,6 +271,10 @@ final class HexSphereBuilder {
         }
 
         assignIdsAndNeighbors();
+
+        for (HexCell cell : cells) {
+            cell.color = Color.BLACK;
+        }
     }
     
     private static HexCell copyCell(HexCell src) {

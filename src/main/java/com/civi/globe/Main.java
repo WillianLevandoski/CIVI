@@ -25,6 +25,7 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 10.50;
     private static final double MAX_ZOOM = 30.2;
+    private static final Color PERMANENT_NEIGHBOR_COLOR = Color.web("#3ddc84");
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -106,11 +107,23 @@ public class Main extends Application {
                 return;
             }
 
+            clickedCell.color = PERMANENT_NEIGHBOR_COLOR;
+
+            for (Integer neighborId : clickedCell.neighbors) {
+                if (neighborId >= 0 && neighborId < mesh.cells.size()) {
+                    mesh.cells.get(neighborId).color = PERMANENT_NEIGHBOR_COLOR;
+                }
+            }
+
             String neighbors = clickedCell.neighbors.stream()
                     .sorted()
                     .map(String::valueOf)
                     .collect(Collectors.joining(", "));
-            selectedInfoLabel.setText("ID: " + clickedCell.id + "\nVizinhos: " + neighbors);
+            selectedInfoLabel.setText(
+                    "ID: " + clickedCell.id
+                            + "\nVizinhos: " + neighbors
+                            + "\nVizinhos coloridos permanentemente: " + clickedCell.neighbors.size()
+            );
         });
 
         new AnimationTimer() {
