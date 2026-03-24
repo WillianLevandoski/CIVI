@@ -5,10 +5,15 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
+import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
@@ -45,6 +50,7 @@ public class Main extends Application {
     private final HexSphereBuilder mesh = new HexSphereBuilder();
     private final List<Face2D> renderedFaces = new ArrayList<>();
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
+    private boolean showColoredGrid = false;
 
     @Override
     public void start(Stage stage) {
@@ -59,8 +65,21 @@ public class Main extends Application {
         selectedInfoLabel.setTextFill(Color.WHITE);
         selectedInfoLabel.setMinWidth(280);
         selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
-        StackPane rightPane = new StackPane(selectedInfoLabel);
-        rightPane.setStyle("-fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
+
+        Button toggleGridButton = new Button("Mostrar grade");
+        toggleGridButton.setMaxWidth(Double.MAX_VALUE);
+        toggleGridButton.setOnAction(e -> {
+            showColoredGrid = !showColoredGrid;
+            toggleGridButton.setText(showColoredGrid ? "Esconder grade" : "Mostrar grade");
+        });
+
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        VBox rightPane = new VBox(selectedInfoLabel, spacer, toggleGridButton);
+        rightPane.setAlignment(Pos.TOP_LEFT);
+        rightPane.setMinWidth(280);
+        rightPane.setStyle("-fx-padding: 12; -fx-spacing: 10; -fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
         layout.setRight(rightPane);
 
         Scene scene = new Scene(layout, 1400, 800, Color.rgb(18, 18, 18));
@@ -181,7 +200,12 @@ public class Main extends Application {
         for (Face2D f : faces) {
             g.setFill(f.cell.color);
             g.fillPolygon(f.x, f.y, 6);
-            g.setStroke(Color.WHITE);
+            Color strokeColor = Color.BLACK;
+            if (showColoredGrid && !Color.BLACK.equals(f.cell.color)) {
+                strokeColor = Color.WHITE;
+            }
+
+            g.setStroke(strokeColor);
             g.setLineWidth(0.7);
             g.strokePolygon(f.x, f.y, 6);
         }
