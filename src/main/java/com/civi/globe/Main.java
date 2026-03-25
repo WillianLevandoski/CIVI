@@ -35,6 +35,7 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
+    private static final double MINIMAP_ZOOM = 1.08;
 
     private double animX = 0.0;
     private double animY = 0.0;
