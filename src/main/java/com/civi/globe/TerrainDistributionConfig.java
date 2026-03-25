@@ -20,7 +20,7 @@ final class TerrainDistributionConfig {
         EnumMap<TerrainType, Double> ratios = new EnumMap<>(TerrainType.class);
         ratios.put(TerrainType.WATER, TerrainType.WATER.getBaseChance());
         ratios.put(TerrainType.LAND, TerrainType.LAND.getBaseChance());
-        return new TerrainDistributionConfig(42841L, 4, ratios, 1.9);
+        return new TerrainDistributionConfig(42841L, 3, ratios, 2.6);
     }
 
     long getSeed() {

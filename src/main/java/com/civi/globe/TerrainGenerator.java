@@ -21,7 +21,6 @@ final class TerrainGenerator {
         smoothTerrain(cells, config.getSmoothingIterations());
         applyBiomeAffinityPlaceholder(cells);
         applyCellColors(cells);
-        applyPolarCapsAfterColoring(cells, points);
     }
 
     private void assignBaseTerrainWithNoise(List<HexCell> cells, PointTable points) {
@@ -63,11 +62,11 @@ final class TerrainGenerator {
         int waterNeighbors = neighborCount.getOrDefault(TerrainType.WATER, 0);
         int landNeighbors = neighborCount.getOrDefault(TerrainType.LAND, 0);
 
-        if (landNeighbors >= 3) {
-            return TerrainType.LAND;
-        }
-        if (waterNeighbors >= 5) {
+        if (waterNeighbors >= 4) {
             return TerrainType.WATER;
+        }
+        if (landNeighbors >= 4) {
+            return TerrainType.LAND;
         }
         return cell.terrainType;
     }
@@ -110,7 +109,7 @@ final class TerrainGenerator {
         double n2 = noise.noise2((lon + 13.7) * scale * 2.0, (lat - 7.3) * scale * 2.0);
         double n3 = noise.noise2((lon - 5.0) * scale * 4.0, (lat + 19.0) * scale * 4.0);
 
-        return (n1 * 0.75) + (n2 * 0.20) + (n3 * 0.05);
+        return (n1 * 0.60) + (n2 * 0.30) + (n3 * 0.10);
     }
 
     private Vec3 calculateCellCenter(HexCell cell, PointTable points) {
@@ -128,21 +127,6 @@ final class TerrainGenerator {
     }
 
     private record CellScore(HexCell cell, double score) {}
-
-    private void applyPolarCapsAfterColoring(List<HexCell> cells, PointTable points) {
-        double polarThreshold = 0.92;
-        for (HexCell cell : cells) {
-            Vec3 center = calculateCellCenter(cell, points);
-            double radius = Math.sqrt((center.x * center.x) + (center.y * center.y) + (center.z * center.z));
-            if (radius == 0.0) {
-                continue;
-            }
-            double normalizedZ = Math.abs(center.z / radius);
-            if (normalizedZ >= polarThreshold) {
-                cell.predefinedColor = TerrainType.POLAR_ICE.getDisplayColor();
-            }
-        }
-    }
 
     private static final class OpenSimplex2D {
         private static final double STRETCH_CONSTANT_2D = -0.211324865405187;
