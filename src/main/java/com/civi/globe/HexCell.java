@@ -11,6 +11,7 @@ final class HexCell {
     final List<Integer> neighbors = new ArrayList<>();
     int a;
     int b;
+    TerrainType terrainType = TerrainType.WATER;
     Color predefinedColor;
     boolean revealed;
 }
