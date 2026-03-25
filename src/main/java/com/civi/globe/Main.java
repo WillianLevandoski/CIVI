@@ -12,6 +12,7 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
@@ -50,6 +51,7 @@ public class Main extends Application {
     private double lastMouseX = 0.0;
     private double lastMouseY = 0.0;
     private boolean dragging = false;
+    private boolean draggingWithSecondaryButton = false;
 
     private boolean upPressed = false;
     private boolean downPressed = false;
@@ -141,12 +143,18 @@ public class Main extends Application {
         scene.setOnKeyReleased(e -> updateKeyboardRotation(e.getCode(), false));
 
         canvas.setOnMousePressed(e -> {
-            dragging = true;
+            draggingWithSecondaryButton = e.getButton() == MouseButton.SECONDARY;
+            dragging = draggingWithSecondaryButton;
             lastMouseX = e.getX();
             lastMouseY = e.getY();
         });
 
-        canvas.setOnMouseReleased(e -> dragging = false);
+        canvas.setOnMouseReleased(e -> {
+            if (e.getButton() == MouseButton.SECONDARY) {
+                dragging = false;
+                draggingWithSecondaryButton = false;
+            }
+        });
 
         canvas.setOnMouseDragged(e -> {
             if (!dragging) {
@@ -156,8 +164,8 @@ public class Main extends Application {
             double dx = e.getX() - lastMouseX;
             double dy = e.getY() - lastMouseY;
 
-            animY += dx * MOUSE_DRAG_SENSITIVITY;
-            animX -= dy * MOUSE_DRAG_SENSITIVITY;
+            animY -= dx * MOUSE_DRAG_SENSITIVITY;
+            animX += dy * MOUSE_DRAG_SENSITIVITY;
 
             lastMouseX = e.getX();
             lastMouseY = e.getY();
@@ -171,6 +179,9 @@ public class Main extends Application {
         });
 
         canvas.setOnMouseClicked(e -> {
+            if (e.getButton() != MouseButton.PRIMARY || draggingWithSecondaryButton) {
+                return;
+            }
             HexCell clickedCell = findCellAt(e.getX(), e.getY());
             if (clickedCell == null) {
                 selectedInfoLabel.setText("Nenhum hexágono selecionado.");
