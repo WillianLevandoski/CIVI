@@ -35,8 +35,6 @@ public class Main extends Application {
     private static final double MIN_ZOOM = 10.50;
     private static final double MAX_ZOOM = 30.2;
     private static final Color PERMANENT_NEIGHBOR_COLOR = Color.web("#3ddc84");
-    private static final Color GLOBE_BACKGROUND_COLOR = Color.rgb(22, 22, 22);
-    private static final Color CANVAS_BACKGROUND_COLOR = Color.rgb(18, 18, 18);
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -89,12 +87,7 @@ public class Main extends Application {
         rightPane.setStyle("-fx-padding: 12; -fx-spacing: 10; -fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
         layout.setRight(rightPane);
 
-        Scene scene = new Scene(layout, 1400, 800, GLOBE_BACKGROUND_COLOR);
-        selectedInfoLabel.setText(
-                "Clique em um hexágono para ver o ID e os vizinhos."
-                        + "\nPolo Norte (aprox.): " + mesh.northPoleCellId()
-                        + " | Polo Sul (aprox.): " + mesh.southPoleCellId()
-        );
+        Scene scene = new Scene(layout, 1400, 800, Color.rgb(18, 18, 18));
 
         canvas.widthProperty().bind(root.widthProperty());
         canvas.heightProperty().bind(root.heightProperty());
@@ -186,7 +179,7 @@ public class Main extends Application {
     }
 
     private void draw(GraphicsContext g, double w, double h) {
-        g.setFill(CANVAS_BACKGROUND_COLOR);
+        g.setFill(Color.rgb(12, 12, 12));
         g.fillRect(0, 0, w, h);
 
         List<Face2D> faces = new ArrayList<>();
@@ -216,7 +209,10 @@ public class Main extends Application {
                 g.setFill(f.cell.color);
                 g.fillPolygon(f.x, f.y, 6);
             }
-            Color strokeColor = showColoredGrid ? Color.WHITE : GLOBE_BACKGROUND_COLOR;
+            Color strokeColor = Color.BLACK;
+            if (showColoredGrid && !Color.BLACK.equals(f.cell.color)) {
+                strokeColor = Color.WHITE;
+            }
 
             g.setStroke(strokeColor);
             g.setLineWidth(0.7);

@@ -10,12 +10,9 @@ import java.util.Set;
 final class HexSphereBuilder {
     private static final double DEG = Math.PI / 180.0;
     private static final double PI2 = Math.PI * 2.0;
-    private static final Color ICE_WHITE = Color.web("#F2F8FF");
 
     final PointTable points = new PointTable();
     final List<HexCell> cells = new ArrayList<>();
-    private int northPoleCellId = -1;
-    private int southPoleCellId = -1;
 
     void build(int n, double r) {
         cells.clear();
@@ -274,19 +271,10 @@ final class HexSphereBuilder {
         }
 
         assignIdsAndNeighbors();
-        identifyPoles();
 
         for (HexCell cell : cells) {
-            cell.color = ICE_WHITE;
+            cell.color = Color.BLACK;
         }
-    }
-
-    int northPoleCellId() {
-        return northPoleCellId;
-    }
-
-    int southPoleCellId() {
-        return southPoleCellId;
     }
     
     private static HexCell copyCell(HexCell src) {
@@ -331,32 +319,6 @@ final class HexSphereBuilder {
             vertices.add(ix);
         }
         return vertices;
-    }
-
-    private void identifyPoles() {
-        double maxZ = Double.NEGATIVE_INFINITY;
-        double minZ = Double.POSITIVE_INFINITY;
-
-        northPoleCellId = -1;
-        southPoleCellId = -1;
-
-        for (HexCell cell : cells) {
-            double centroidZ = 0.0;
-            for (int ix : cell.ix) {
-                centroidZ += points.get(ix).z;
-            }
-            centroidZ /= cell.ix.length;
-
-            if (centroidZ > maxZ) {
-                maxZ = centroidZ;
-                northPoleCellId = cell.id;
-            }
-
-            if (centroidZ < minZ) {
-                minZ = centroidZ;
-                southPoleCellId = cell.id;
-            }
-        }
     }
 
     private static void rotate2d(double ang, Vec3 p) {
