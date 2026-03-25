@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 public class Main extends Application {
     private static final int BASE_SUBDIVISIONS = 10; // configuração atual (1x)
-    private static final int GLOBE_DETAIL_MULTIPLIER = 2; // altere aqui para aumentar/reduzir densidade
+    private static final int GLOBE_DETAIL_MULTIPLIER = 3; // altere aqui para aumentar/reduzir densidade
     private static final double KEYBOARD_ROTATION_SPEED = 0.5;
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
@@ -163,8 +163,8 @@ public class Main extends Application {
             double dx = e.getX() - lastMouseX;
             double dy = e.getY() - lastMouseY;
 
-            animY -= dx * MOUSE_DRAG_SENSITIVITY;
-            animX += dy * MOUSE_DRAG_SENSITIVITY;
+       //     animY -= dx * MOUSE_DRAG_SENSITIVITY;
+         //   animX += dy * MOUSE_DRAG_SENSITIVITY;
 
             lastMouseX = e.getX();
             lastMouseY = e.getY();
