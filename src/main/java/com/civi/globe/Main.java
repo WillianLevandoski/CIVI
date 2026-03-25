@@ -32,7 +32,6 @@ public class Main extends Application {
     private static final int BASE_SUBDIVISIONS = 10; // configuração atual (1x)
     private static final int GLOBE_DETAIL_MULTIPLIER = 2; // altere aqui para aumentar/reduzir densidade
     private static final double KEYBOARD_ROTATION_SPEED = 0.5;
-    private static final double MOUSE_DRAG_SENSITIVITY = 0.50;
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
