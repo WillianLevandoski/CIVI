@@ -3,7 +3,7 @@ package com.civi.globe;
 import javafx.scene.paint.Color;
 
 import java.util.Collections;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 
 enum TerrainType {
@@ -13,7 +13,7 @@ enum TerrainType {
     private final double baseChance;
     private final int priority;
     private final Color displayColor;
-    private final Map<TerrainType, Double> affinityWeights = new EnumMap<>(TerrainType.class);
+    private final Map<TerrainType, Double> affinityWeights = new HashMap<>();
 
     TerrainType(double baseChance, int priority, Color displayColor) {
         this.baseChance = baseChance;
