@@ -34,6 +34,7 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
+    private static final double INITIAL_ZOOM = MIN_ZOOM * 2.0;
     private static final double MINIMAP_ZOOM = 1.20;
     private static final double MINIMAP_MAX_MERCATOR_LATITUDE = Math.toRadians(82.0);
     private static final double MINIMAP_HALF_MERCATOR_SPAN = 2.25;
@@ -43,7 +44,7 @@ public class Main extends Application {
     private double animY = 0.0;
     private double dAnimX = 0.0;
     private double dAnimY = 0.0;
-    private double zoom = 1.0;
+    private double zoom = INITIAL_ZOOM;
 
     private double lastMouseX = 0.0;
     private double lastMouseY = 0.0;
@@ -204,6 +205,7 @@ public class Main extends Application {
 
         stage.setTitle("Hex Sphere (Java port)");
         stage.setScene(scene);
+        stage.setMaximized(true);
         stage.show();
         scene.getRoot().requestFocus();
     }
