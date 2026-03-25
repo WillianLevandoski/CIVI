@@ -221,14 +221,11 @@ public class Main extends Application {
                 g.setFill(f.cell.predefinedColor);
                 g.fillPolygon(f.x, f.y, 6);
             }
-            Color strokeColor = Color.BLACK;
-            if (showColoredGrid && f.cell.revealed) {
-                strokeColor = Color.WHITE;
+            if (showColoredGrid) {
+                g.setStroke(Color.WHITE);
+                g.setLineWidth(0.7);
+                g.strokePolygon(f.x, f.y, 6);
             }
-
-            g.setStroke(strokeColor);
-            g.setLineWidth(0.7);
-            g.strokePolygon(f.x, f.y, 6);
         }
     }
 
