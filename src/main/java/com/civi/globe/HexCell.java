@@ -11,5 +11,6 @@ final class HexCell {
     final List<Integer> neighbors = new ArrayList<>();
     int a;
     int b;
-    Color color;
+    Color predefinedColor;
+    boolean revealed;
 }

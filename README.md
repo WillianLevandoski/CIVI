@@ -28,6 +28,14 @@ mvn javafx:run
 - A imagem é esticada para caber no hexágono e é recortada pelo contorno do polígono, sem vazar para os vizinhos.
 - Se o arquivo não existir, o app faz fallback para o preenchimento por cor.
 
+## Revelação de cores
+
+- Todas as células começam ocultas (pretas/texturizadas).
+- Ao clicar em um hexágono, ele e seus vizinhos são revelados.
+- As cores são pré-definidas após a criação da malha:
+  - 65% azul (`Color.DODGERBLUE`) distribuído aleatoriamente.
+  - 35% amarelo (`Color.GOLD`).
+
 ## Estrutura
 
 - `Main.java`: app JavaFX + renderização 2D em perspectiva.
