@@ -23,6 +23,7 @@ import javafx.stage.Stage;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,7 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
+    private static final double INITIAL_ZOOM = MIN_ZOOM * 2.0;
     private static final double MINIMAP_ZOOM = 1.20;
     private static final double MINIMAP_MAX_MERCATOR_LATITUDE = Math.toRadians(82.0);
     private static final double MINIMAP_HALF_MERCATOR_SPAN = 2.25;
@@ -43,7 +45,7 @@ public class Main extends Application {
     private double animY = 0.0;
     private double dAnimX = 0.0;
     private double dAnimY = 0.0;
-    private double zoom = 1.0;
+    private double zoom = INITIAL_ZOOM;
 
     private double lastMouseX = 0.0;
     private double lastMouseY = 0.0;
@@ -56,6 +58,7 @@ public class Main extends Application {
 
     private final HexSphereBuilder mesh = new HexSphereBuilder();
     private final List<Face2D> renderedFaces = new ArrayList<>();
+    private final Label zoomInfoLabel = new Label();
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
     private final Canvas minimapCanvas = new Canvas(256, 140);
     private final Image hexTexture = loadTexture("/textures/hex-tile.png");
@@ -78,6 +81,9 @@ public class Main extends Application {
         selectedInfoLabel.setTextFill(Color.WHITE);
         selectedInfoLabel.setMinWidth(280);
         selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
+        zoomInfoLabel.setTextFill(Color.WHITE);
+        zoomInfoLabel.setStyle("-fx-padding: 4 12 8 12; -fx-font-size: 13;");
+        updateZoomInfoLabel();
         minimapCanvas.setWidth(256);
         minimapCanvas.setHeight(140);
 
@@ -120,7 +126,7 @@ public class Main extends Application {
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        VBox rightPane = new VBox(minimapCanvas, selectedInfoLabel, spacer, toggleGridButton, paintAllButton);
+        VBox rightPane = new VBox(minimapCanvas, zoomInfoLabel, selectedInfoLabel, spacer, toggleGridButton, paintAllButton);
         rightPane.setAlignment(Pos.TOP_LEFT);
         rightPane.setMinWidth(280);
         rightPane.setStyle("-fx-padding: 12; -fx-spacing: 10; -fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
@@ -161,6 +167,7 @@ public class Main extends Application {
             double direction = e.getDeltaY() > 0 ? 1.0 : -1.0;
             zoom += direction * ZOOM_SCROLL_STEP;
             zoom = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+            updateZoomInfoLabel();
         });
 
         canvas.setOnMouseClicked(e -> {
@@ -204,6 +211,7 @@ public class Main extends Application {
 
         stage.setTitle("Hex Sphere (Java port)");
         stage.setScene(scene);
+        stage.setMaximized(true);
         stage.show();
         scene.getRoot().requestFocus();
     }
@@ -221,6 +229,10 @@ public class Main extends Application {
         if (downPressed && !upPressed) dAnimX = KEYBOARD_ROTATION_SPEED;
         if (leftPressed && !rightPressed) dAnimY = -KEYBOARD_ROTATION_SPEED;
         if (rightPressed && !leftPressed) dAnimY = KEYBOARD_ROTATION_SPEED;
+    }
+
+    private void updateZoomInfoLabel() {
+        zoomInfoLabel.setText(String.format(Locale.US, "Zoom atual: %.2fx", zoom));
     }
 
     private void draw(GraphicsContext g, double w, double h) {
