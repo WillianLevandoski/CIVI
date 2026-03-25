@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 enum TerrainType {
-    WATER(0.65, 1, Color.DODGERBLUE),
-    LAND(0.35, 2, Color.GOLD);
+    WATER(0.60, 1, Color.DODGERBLUE),
+    LAND(0.40, 2, Color.GOLD);
 
     private final double baseChance;
     private final int priority;

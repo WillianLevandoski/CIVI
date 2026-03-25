@@ -32,8 +32,8 @@ public class Main extends Application {
     private static final double KEYBOARD_ROTATION_SPEED = 0.5;
     private static final double MOUSE_DRAG_SENSITIVITY = 0.50;
     private static final double ZOOM_SCROLL_STEP = 0.50;
-    private static final double MIN_ZOOM = 10.50;
-    private static final double MAX_ZOOM = 30.2;
+    private static final double MIN_ZOOM = 2.50;
+    private static final double MAX_ZOOM = 20.2;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -223,7 +223,7 @@ public class Main extends Application {
             }
             if (showColoredGrid) {
                 g.setStroke(Color.WHITE);
-                g.setLineWidth(0.7);
+                g.setLineWidth(0.0);
                 g.strokePolygon(f.x, f.y, 6);
             }
         }
