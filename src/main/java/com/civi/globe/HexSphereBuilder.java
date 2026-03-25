@@ -270,10 +270,40 @@ final class HexSphereBuilder {
             cells.add(copyCell(h));
         }
 
+        enforceHexOnlyCells();
         assignIdsAndNeighbors();
 
         for (HexCell cell : cells) {
             cell.color = Color.BLACK;
+        }
+    }
+
+    private void enforceHexOnlyCells() {
+        for (HexCell cell : cells) {
+            int guard = 0;
+            while (uniqueVertexIndexes(cell).size() < 6 && guard < 6) {
+                boolean changed = false;
+                for (int i = 0; i < 6; i++) {
+                    int next = (i + 1) % 6;
+                    if (cell.ix[i] == cell.ix[next]) {
+                        int after = (i + 2) % 6;
+                        Vec3 a = points.get(cell.ix[next]);
+                        Vec3 b = points.get(cell.ix[after]);
+                        int midpoint = points.add(
+                                (a.x + b.x) * 0.5,
+                                (a.y + b.y) * 0.5,
+                                (a.z + b.z) * 0.5
+                        );
+                        cell.ix[next] = midpoint;
+                        changed = true;
+                        break;
+                    }
+                }
+                if (!changed) {
+                    break;
+                }
+                guard++;
+            }
         }
     }
     
