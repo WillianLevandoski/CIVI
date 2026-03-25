@@ -34,8 +34,6 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 10.50;
     private static final double MAX_ZOOM = 30.2;
-    private static final Color PERMANENT_NEIGHBOR_COLOR = Color.web("#3ddc84");
-    private static final Color POLE_COLOR = Color.WHITE;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -57,14 +55,10 @@ public class Main extends Application {
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
     private final Image hexTexture = loadTexture("/textures/hex-tile.png");
     private boolean showColoredGrid = false;
-    private int northPoleId = -1;
-    private int southPoleId = -1;
 
     @Override
     public void start(Stage stage) {
         mesh.build(BASE_SUBDIVISIONS * GLOBE_DETAIL_MULTIPLIER, 1.5);
-        detectPoles();
-        paintPolesIfKnown();
 
         Canvas canvas = new Canvas(1100, 800);
         StackPane root = new StackPane(canvas);
@@ -86,8 +80,8 @@ public class Main extends Application {
         Button paintAllButton = new Button("Mostrar tudo");
         paintAllButton.setMaxWidth(Double.MAX_VALUE);
         paintAllButton.setOnAction(e -> {
-            int painted = paintAllUnpaintedCells();
-            selectedInfoLabel.setText("Células pintadas: " + painted + ". Polos permanecem brancos.");
+            int revealed = revealAllHiddenCells();
+            selectedInfoLabel.setText("Células reveladas: " + revealed + ".");
         });
 
         Region spacer = new Region();
@@ -143,14 +137,12 @@ public class Main extends Application {
                 return;
             }
 
+            clickedCell.revealed = true;
             for (Integer neighborId : clickedCell.neighbors) {
                 if (neighborId >= 0 && neighborId < mesh.cells.size()) {
-                    if (neighborId != northPoleId && neighborId != southPoleId) {
-                        mesh.cells.get(neighborId).color = PERMANENT_NEIGHBOR_COLOR;
-                    }
+                    mesh.cells.get(neighborId).revealed = true;
                 }
             }
-            paintPolesIfKnown();
 
             String neighbors = clickedCell.neighbors.stream()
                     .sorted()
@@ -159,7 +151,7 @@ public class Main extends Application {
             selectedInfoLabel.setText(
                     "ID: " + clickedCell.id
                             + "\nVizinhos: " + neighbors
-                            + "\nVizinhos coloridos permanentemente: " + clickedCell.neighbors.size()
+                            + "\nCélula clicada e vizinhos revelados: " + (clickedCell.neighbors.size() + 1)
             );
         });
 
@@ -198,7 +190,6 @@ public class Main extends Application {
         g.fillRect(0, 0, w, h);
 
         List<Face2D> faces = new ArrayList<>();
-        paintPolesIfKnown();
         for (HexCell c : mesh.cells) {
             double[] xs = new double[6];
             double[] ys = new double[6];
@@ -219,14 +210,19 @@ public class Main extends Application {
         renderedFaces.clear();
         renderedFaces.addAll(faces);
         for (Face2D f : faces) {
-            if (hexTexture != null && Color.BLACK.equals(f.cell.color)) {
-                drawTexturedPolygon(g, f.x, f.y, hexTexture);
+            if (!f.cell.revealed) {
+                if (hexTexture != null) {
+                    drawTexturedPolygon(g, f.x, f.y, hexTexture);
+                } else {
+                    g.setFill(Color.BLACK);
+                    g.fillPolygon(f.x, f.y, 6);
+                }
             } else {
-                g.setFill(f.cell.color);
+                g.setFill(f.cell.predefinedColor);
                 g.fillPolygon(f.x, f.y, 6);
             }
             Color strokeColor = Color.BLACK;
-            if (showColoredGrid && !Color.BLACK.equals(f.cell.color)) {
+            if (showColoredGrid && f.cell.revealed) {
                 strokeColor = Color.WHITE;
             }
 
@@ -236,61 +232,16 @@ public class Main extends Application {
         }
     }
 
-    private void detectPoles() {
-        if (mesh.cells.isEmpty() || mesh.points.isEmpty()) {
-            northPoleId = -1;
-            southPoleId = -1;
-            return;
-        }
-
-        HexCell northPole = null;
-        HexCell southPole = null;
-        double northZ = Double.NEGATIVE_INFINITY;
-        double southZ = Double.POSITIVE_INFINITY;
-
+    private int revealAllHiddenCells() {
+        int revealedCount = 0;
         for (HexCell cell : mesh.cells) {
-            double centerZ = 0.0;
-            for (int i = 0; i < 6; i++) {
-                centerZ += mesh.points.get(cell.ix[i]).z;
-            }
-            centerZ /= 6.0;
-
-            if (centerZ > northZ) {
-                northZ = centerZ;
-                northPole = cell;
-            }
-            if (centerZ < southZ) {
-                southZ = centerZ;
-                southPole = cell;
-            }
-        }
-
-        northPoleId = northPole == null ? -1 : northPole.id;
-        southPoleId = southPole == null ? -1 : southPole.id;
-    }
-
-    private boolean paintPolesIfKnown() {
-        if (northPoleId < 0 || southPoleId < 0
-                || northPoleId >= mesh.cells.size() || southPoleId >= mesh.cells.size()) {
-            return false;
-        }
-
-        mesh.cells.get(northPoleId).color = POLE_COLOR;
-        mesh.cells.get(southPoleId).color = POLE_COLOR;
-        return true;
-    }
-
-    private int paintAllUnpaintedCells() {
-        int paintedCount = 0;
-        for (HexCell cell : mesh.cells) {
-            if ((cell.id == northPoleId || cell.id == southPoleId) || !Color.BLACK.equals(cell.color)) {
+            if (cell.revealed) {
                 continue;
             }
-            cell.color = PERMANENT_NEIGHBOR_COLOR;
-            paintedCount++;
+            cell.revealed = true;
+            revealedCount++;
         }
-        paintPolesIfKnown();
-        return paintedCount;
+        return revealedCount;
     }
 
     private HexCell findCellAt(double x, double y) {
