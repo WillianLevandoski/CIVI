@@ -34,9 +34,9 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
-    private static final double MINIMAP_ZOOM = 1.08;
-    private static final double MINIMAP_HALF_LATITUDE_SPAN = Math.toRadians(90.0);
-    private static final double MINIMAP_LATITUDE_STRETCH = 1.22;
+    private static final double MINIMAP_ZOOM = 1.04;
+    private static final double MINIMAP_MAX_MERCATOR_LATITUDE = Math.toRadians(82.0);
+    private static final double MINIMAP_HALF_MERCATOR_SPAN = 2.25;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -401,12 +401,13 @@ public class Main extends Application {
         // Eixo X dinâmico com wrap total de 360° para manter a continuidade nas extremidades.
         double normalizedX = (wrapRadians(point.longitude - centerLongitude) / (Math.PI * 2.0)) + 0.5;
 
-        // Eixo Y mais plano (estilo mapa-múndi) para melhorar navegação norte/sul.
-        double deltaLatitude = point.latitude - centerLatitude;
-        double normalizedY = clamp(deltaLatitude / MINIMAP_HALF_LATITUDE_SPAN, -1.0, 1.0);
+        // Projeção de Mercator relativa ao centro atual para melhorar percepção de latitude.
+        double centerMercator = mercatorLatitude(centerLatitude);
+        double pointMercator = mercatorLatitude(point.latitude);
+        double normalizedY = (pointMercator - centerMercator) / MINIMAP_HALF_MERCATOR_SPAN;
 
         double mapX = normalizedX * width;
-        double mapY = (height * 0.5) - (normalizedY * (height * 0.5) * MINIMAP_ZOOM * MINIMAP_LATITUDE_STRETCH);
+        double mapY = (height * 0.5) - (normalizedY * (height * 0.5) * MINIMAP_ZOOM);
         return new Vec3(mapX, mapY, 0.0);
     }
 
@@ -461,6 +462,10 @@ public class Main extends Application {
         return new GeoPoint(longitude, latitude);
     }
 
+    private static double mercatorLatitude(double latitudeRadians) {
+        double clampedLatitude = clamp(latitudeRadians, -MINIMAP_MAX_MERCATOR_LATITUDE, MINIMAP_MAX_MERCATOR_LATITUDE);
+        return Math.log(Math.tan((Math.PI * 0.25) + (clampedLatitude * 0.5)));
+    }
 
     private static double wrapRadians(double angle) {
         while (angle > Math.PI) {
