@@ -11,6 +11,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.KeyCode;
 import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
@@ -74,6 +75,7 @@ public class Main extends Application {
         selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
         minimapCanvas.setWidth(256);
         minimapCanvas.setHeight(140);
+        minimapCanvas.setOnMouseClicked(this::handleMinimapClick);
 
         Button toggleGridButton = new Button("Mostrar grade");
         toggleGridButton.setMaxWidth(Double.MAX_VALUE);
@@ -145,7 +147,6 @@ public class Main extends Application {
             }
 
             selectedCellId = clickedCell.id;
-            centerCellOnScreen(clickedCell);
             clickedCell.revealed = true;
             for (Integer neighborId : clickedCell.neighbors) {
                 if (neighborId >= 0 && neighborId < mesh.cells.size()) {
@@ -374,7 +375,7 @@ public class Main extends Application {
         g.strokeLine((w * 3.0) / 4.0, 0, (w * 3.0) / 4.0, h);
 
         for (HexCell cell : mesh.cells) {
-            Vec3 projected = projectCellToMollweide(cell, w, h, MINIMAP_ZOOM);
+            Vec3 projected = projectCellToEquirectangular(cell, w, h);
             Color fill = cell.revealed ? cell.predefinedColor : Color.rgb(22, 22, 22);
             g.setFill(fill);
             g.fillOval(projected.x - 1.4, projected.y - 1.4, 2.8, 2.8);
@@ -382,7 +383,7 @@ public class Main extends Application {
 
         if (selectedCellId != null && selectedCellId >= 0 && selectedCellId < mesh.cells.size()) {
             HexCell selectedCell = mesh.cells.get(selectedCellId);
-            Vec3 selectedPoint = projectCellToMollweide(selectedCell, w, h, MINIMAP_ZOOM);
+            Vec3 selectedPoint = projectCellToEquirectangular(selectedCell, w, h);
 
             g.setFill(Color.rgb(255, 210, 0));
             g.fillOval(selectedPoint.x - 4.5, selectedPoint.y - 4.5, 9.0, 9.0);
@@ -392,7 +393,43 @@ public class Main extends Application {
         }
     }
 
-    private Vec3 projectCellToMollweide(HexCell cell, double width, double height, double zoom) {
+    private void handleMinimapClick(MouseEvent event) {
+        HexCell nearest = findNearestCellOnMap(event.getX(), event.getY(), minimapCanvas.getWidth(), minimapCanvas.getHeight());
+        if (nearest == null) {
+            return;
+        }
+
+        selectedCellId = nearest.id;
+        nearest.revealed = true;
+        String neighbors = nearest.neighbors.stream()
+                .sorted()
+                .map(String::valueOf)
+                .collect(Collectors.joining(", "));
+        selectedInfoLabel.setText(
+                "ID: " + nearest.id
+                        + "\nVizinhos: " + neighbors
+                        + "\nSelecionado pelo mapa plano."
+        );
+        drawMinimap();
+    }
+
+    private HexCell findNearestCellOnMap(double x, double y, double w, double h) {
+        HexCell nearest = null;
+        double minDistanceSquared = Double.MAX_VALUE;
+        for (HexCell cell : mesh.cells) {
+            Vec3 mapPoint = projectCellToEquirectangular(cell, w, h);
+            double dx = mapPoint.x - x;
+            double dy = mapPoint.y - y;
+            double distanceSquared = (dx * dx) + (dy * dy);
+            if (distanceSquared < minDistanceSquared) {
+                minDistanceSquared = distanceSquared;
+                nearest = cell;
+            }
+        }
+        return nearest;
+    }
+
+    private Vec3 projectCellToEquirectangular(HexCell cell, double width, double height) {
         Vec3 center = averageCellCenter(cell);
         double length = Math.sqrt((center.x * center.x) + (center.y * center.y) + (center.z * center.z));
         if (length > 0) {
@@ -402,24 +439,8 @@ public class Main extends Application {
         double longitude = Math.atan2(center.z, center.x);
         double latitude = Math.asin(clamp(center.y, -1.0, 1.0));
 
-        double theta = latitude;
-        for (int i = 0; i < 6; i++) {
-            double numerator = (2.0 * theta) + Math.sin(2.0 * theta) - (Math.PI * Math.sin(latitude));
-            double denominator = 2.0 + (2.0 * Math.cos(2.0 * theta));
-            if (Math.abs(denominator) < 1e-9) {
-                break;
-            }
-            theta -= numerator / denominator;
-        }
-
-        double xNorm = (2.0 * Math.sqrt(2.0) / Math.PI) * longitude * Math.cos(theta);
-        double yNorm = Math.sqrt(2.0) * Math.sin(theta);
-
-        double xScaled = (xNorm / (2.0 * Math.sqrt(2.0))) * zoom;
-        double yScaled = (yNorm / Math.sqrt(2.0)) * zoom;
-
-        double mapX = ((xScaled + 1.0) * 0.5) * width;
-        double mapY = ((1.0 - (yScaled + 1.0) * 0.5)) * height;
+        double mapX = ((longitude + Math.PI) / (2.0 * Math.PI)) * width;
+        double mapY = ((Math.PI / 2.0 - latitude) / Math.PI) * height;
         return new Vec3(mapX, mapY, 0.0);
     }
 
@@ -434,25 +455,6 @@ public class Main extends Application {
             z += point.z;
         }
         return new Vec3(x / cell.ix.length, y / cell.ix.length, z / cell.ix.length);
-    }
-
-    private void centerCellOnScreen(HexCell cell) {
-        Vec3 center = averageCellCenter(cell);
-        double length = Math.sqrt((center.x * center.x) + (center.y * center.y) + (center.z * center.z));
-        if (length <= 0.0) {
-            return;
-        }
-
-        double nx = center.x / length;
-        double ny = center.y / length;
-        double nz = center.z / length;
-
-        double targetY = Math.atan2(-nx, nz);
-        double z1 = Math.sqrt((nx * nx) + (nz * nz));
-        double targetX = Math.atan2(ny, z1);
-
-        animY = Math.toDegrees(targetY);
-        animX = Math.toDegrees(targetX);
     }
 
     private record Face2D(double[] x, double[] y, double z, HexCell cell) {}
