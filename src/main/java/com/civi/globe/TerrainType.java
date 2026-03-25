@@ -7,18 +7,20 @@ import java.util.HashMap;
 import java.util.Map;
 
 enum TerrainType {
-    WATER(0.60, 1, Color.DODGERBLUE),
-    LAND(0.40, 2, Color.GOLD);
+    WATER(0.60, 1, Color.DODGERBLUE, Color.DODGERBLUE),
+    LAND(0.40, 2, Color.GOLD, Color.FORESTGREEN);
 
     private final double baseChance;
     private final int priority;
     private final Color displayColor;
+    private final Color secondaryDisplayColor;
     private final Map<TerrainType, Double> affinityWeights = new HashMap<>();
 
-    TerrainType(double baseChance, int priority, Color displayColor) {
+    TerrainType(double baseChance, int priority, Color displayColor, Color secondaryDisplayColor) {
         this.baseChance = baseChance;
         this.priority = priority;
         this.displayColor = displayColor;
+        this.secondaryDisplayColor = secondaryDisplayColor;
     }
 
     double getBaseChance() {
@@ -31,6 +33,10 @@ enum TerrainType {
 
     Color getDisplayColor() {
         return displayColor;
+    }
+
+    Color getSecondaryDisplayColor() {
+        return secondaryDisplayColor;
     }
 
     void setAffinity(TerrainType other, double weight) {
