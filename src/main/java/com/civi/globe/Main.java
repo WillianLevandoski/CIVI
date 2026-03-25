@@ -78,10 +78,14 @@ public class Main extends Application {
             toggleGridButton.setText(showColoredGrid ? "Esconder grade" : "Mostrar grade");
         });
 
+        Button paintAllButton = new Button("Mostrar td");
+        paintAllButton.setMaxWidth(Double.MAX_VALUE);
+        paintAllButton.setOnAction(e -> paintAllHexagons());
+
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        VBox rightPane = new VBox(selectedInfoLabel, spacer, toggleGridButton);
+        VBox rightPane = new VBox(selectedInfoLabel, spacer, toggleGridButton, paintAllButton);
         rightPane.setAlignment(Pos.TOP_LEFT);
         rightPane.setMinWidth(280);
         rightPane.setStyle("-fx-padding: 12; -fx-spacing: 10; -fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
@@ -203,7 +207,7 @@ public class Main extends Application {
         renderedFaces.clear();
         renderedFaces.addAll(faces);
         for (Face2D f : faces) {
-            if (hexTexture != null) {
+            if (hexTexture != null && Color.BLACK.equals(f.cell.color)) {
                 drawTexturedPolygon(g, f.x, f.y, hexTexture);
             } else {
                 g.setFill(f.cell.color);
@@ -217,6 +221,12 @@ public class Main extends Application {
             g.setStroke(strokeColor);
             g.setLineWidth(0.7);
             g.strokePolygon(f.x, f.y, 6);
+        }
+    }
+
+    private void paintAllHexagons() {
+        for (HexCell cell : mesh.cells) {
+            cell.color = PERMANENT_NEIGHBOR_COLOR;
         }
     }
 
