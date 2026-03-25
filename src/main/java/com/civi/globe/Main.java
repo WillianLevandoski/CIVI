@@ -237,7 +237,7 @@ public class Main extends Application {
     }
 
     private void detectPoles() {
-        if (mesh.cells.isEmpty() || mesh.points.size() == 0) {
+        if (mesh.cells.isEmpty() || mesh.points.isEmpty()) {
             northPoleId = -1;
             southPoleId = -1;
             return;
