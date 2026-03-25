@@ -35,6 +35,7 @@ public class Main extends Application {
     private static final double MIN_ZOOM = 10.50;
     private static final double MAX_ZOOM = 30.2;
     private static final Color PERMANENT_NEIGHBOR_COLOR = Color.web("#3ddc84");
+    private static final Color POLE_COLOR = Color.WHITE;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -80,7 +81,11 @@ public class Main extends Application {
 
         Button paintAllButton = new Button("Mostrar td");
         paintAllButton.setMaxWidth(Double.MAX_VALUE);
-        paintAllButton.setOnAction(e -> paintAllHexagons());
+        paintAllButton.setOnAction(e -> {
+            if (paintPolesIfKnown()) {
+                selectedInfoLabel.setText("Polos detectados e pintados de branco.");
+            }
+        });
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
@@ -224,10 +229,40 @@ public class Main extends Application {
         }
     }
 
-    private void paintAllHexagons() {
-        for (HexCell cell : mesh.cells) {
-            cell.color = PERMANENT_NEIGHBOR_COLOR;
+    private boolean paintPolesIfKnown() {
+        if (mesh.cells.isEmpty() || mesh.points.size() == 0) {
+            return false;
         }
+
+        HexCell northPole = null;
+        HexCell southPole = null;
+        double northZ = Double.NEGATIVE_INFINITY;
+        double southZ = Double.POSITIVE_INFINITY;
+
+        for (HexCell cell : mesh.cells) {
+            double centerZ = 0.0;
+            for (int i = 0; i < 6; i++) {
+                centerZ += mesh.points.get(cell.ix[i]).z;
+            }
+            centerZ /= 6.0;
+
+            if (centerZ > northZ) {
+                northZ = centerZ;
+                northPole = cell;
+            }
+            if (centerZ < southZ) {
+                southZ = centerZ;
+                southPole = cell;
+            }
+        }
+
+        if (northPole == null || southPole == null) {
+            return false;
+        }
+
+        northPole.color = POLE_COLOR;
+        southPole.color = POLE_COLOR;
+        return true;
     }
 
     private HexCell findCellAt(double x, double y) {
