@@ -34,6 +34,7 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
+    private static final double MINIMAP_ZOOM = 1.08;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -53,8 +54,10 @@ public class Main extends Application {
     private final HexSphereBuilder mesh = new HexSphereBuilder();
     private final List<Face2D> renderedFaces = new ArrayList<>();
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
+    private final Canvas minimapCanvas = new Canvas(256, 140);
     private final Image hexTexture = loadTexture("/textures/hex-tile.png");
     private boolean showColoredGrid = false;
+    private Integer selectedCellId;
 
     @Override
     public void start(Stage stage) {
@@ -69,6 +72,8 @@ public class Main extends Application {
         selectedInfoLabel.setTextFill(Color.WHITE);
         selectedInfoLabel.setMinWidth(280);
         selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
+        minimapCanvas.setWidth(256);
+        minimapCanvas.setHeight(140);
 
         Button toggleGridButton = new Button("Mostrar grade");
         toggleGridButton.setMaxWidth(Double.MAX_VALUE);
@@ -87,7 +92,7 @@ public class Main extends Application {
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
-        VBox rightPane = new VBox(selectedInfoLabel, spacer, toggleGridButton, paintAllButton);
+        VBox rightPane = new VBox(minimapCanvas, selectedInfoLabel, spacer, toggleGridButton, paintAllButton);
         rightPane.setAlignment(Pos.TOP_LEFT);
         rightPane.setMinWidth(280);
         rightPane.setStyle("-fx-padding: 12; -fx-spacing: 10; -fx-background-color: #1c1c1c; -fx-border-color: #303030; -fx-border-width: 0 0 0 1;");
@@ -134,9 +139,13 @@ public class Main extends Application {
             HexCell clickedCell = findCellAt(e.getX(), e.getY());
             if (clickedCell == null) {
                 selectedInfoLabel.setText("Nenhum hexágono selecionado.");
+                selectedCellId = null;
+                drawMinimap();
                 return;
             }
 
+            selectedCellId = clickedCell.id;
+            centerCellOnScreen(clickedCell);
             clickedCell.revealed = true;
             for (Integer neighborId : clickedCell.neighbors) {
                 if (neighborId >= 0 && neighborId < mesh.cells.size()) {
@@ -153,6 +162,7 @@ public class Main extends Application {
                             + "\nVizinhos: " + neighbors
                             + "\nCélula clicada e vizinhos revelados: " + (clickedCell.neighbors.size() + 1)
             );
+            drawMinimap();
         });
 
         new AnimationTimer() {
@@ -161,6 +171,7 @@ public class Main extends Application {
                 animX = (animX + dAnimX) % 360.0;
                 animY = (animY + dAnimY) % 360.0;
                 draw(canvas.getGraphicsContext2D(), canvas.getWidth(), canvas.getHeight());
+                drawMinimap();
             }
         }.start();
 
@@ -238,6 +249,7 @@ public class Main extends Application {
             cell.revealed = true;
             revealedCount++;
         }
+        drawMinimap();
         return revealedCount;
     }
 
@@ -341,6 +353,106 @@ public class Main extends Application {
         g.clip();
         g.drawImage(image, minX, minY, maxX - minX, maxY - minY);
         g.restore();
+    }
+
+    private void drawMinimap() {
+        GraphicsContext g = minimapCanvas.getGraphicsContext2D();
+        double w = minimapCanvas.getWidth();
+        double h = minimapCanvas.getHeight();
+
+        g.setFill(Color.rgb(14, 14, 14));
+        g.fillRect(0, 0, w, h);
+
+        g.setStroke(Color.rgb(50, 50, 50));
+        g.setLineWidth(1.0);
+        g.strokeRect(0.5, 0.5, w - 1.0, h - 1.0);
+
+        g.setStroke(Color.rgb(40, 40, 40));
+        g.strokeLine(0, h / 2.0, w, h / 2.0);
+        g.strokeLine(w / 4.0, 0, w / 4.0, h);
+        g.strokeLine(w / 2.0, 0, w / 2.0, h);
+        g.strokeLine((w * 3.0) / 4.0, 0, (w * 3.0) / 4.0, h);
+
+        for (HexCell cell : mesh.cells) {
+            Vec3 projected = projectCellToMollweide(cell, w, h, MINIMAP_ZOOM);
+            Color fill = cell.revealed ? cell.predefinedColor : Color.rgb(22, 22, 22);
+            g.setFill(fill);
+            g.fillOval(projected.x - 1.4, projected.y - 1.4, 2.8, 2.8);
+        }
+
+        if (selectedCellId != null && selectedCellId >= 0 && selectedCellId < mesh.cells.size()) {
+            HexCell selectedCell = mesh.cells.get(selectedCellId);
+            Vec3 selectedPoint = projectCellToMollweide(selectedCell, w, h, MINIMAP_ZOOM);
+
+            g.setFill(Color.rgb(255, 210, 0));
+            g.fillOval(selectedPoint.x - 4.5, selectedPoint.y - 4.5, 9.0, 9.0);
+            g.setStroke(Color.BLACK);
+            g.setLineWidth(1.2);
+            g.strokeOval(selectedPoint.x - 4.5, selectedPoint.y - 4.5, 9.0, 9.0);
+        }
+    }
+
+    private Vec3 projectCellToMollweide(HexCell cell, double width, double height, double zoom) {
+        Vec3 center = averageCellCenter(cell);
+        double length = Math.sqrt((center.x * center.x) + (center.y * center.y) + (center.z * center.z));
+        if (length > 0) {
+            center = new Vec3(center.x / length, center.y / length, center.z / length);
+        }
+
+        double longitude = Math.atan2(center.z, center.x);
+        double latitude = Math.asin(clamp(center.y, -1.0, 1.0));
+
+        double theta = latitude;
+        for (int i = 0; i < 6; i++) {
+            double numerator = (2.0 * theta) + Math.sin(2.0 * theta) - (Math.PI * Math.sin(latitude));
+            double denominator = 2.0 + (2.0 * Math.cos(2.0 * theta));
+            if (Math.abs(denominator) < 1e-9) {
+                break;
+            }
+            theta -= numerator / denominator;
+        }
+
+        double xNorm = (2.0 * Math.sqrt(2.0) / Math.PI) * longitude * Math.cos(theta);
+        double yNorm = Math.sqrt(2.0) * Math.sin(theta);
+
+        double xScaled = (xNorm / (2.0 * Math.sqrt(2.0))) * zoom;
+        double yScaled = (yNorm / Math.sqrt(2.0)) * zoom;
+
+        double mapX = ((xScaled + 1.0) * 0.5) * width;
+        double mapY = ((1.0 - (yScaled + 1.0) * 0.5)) * height;
+        return new Vec3(mapX, mapY, 0.0);
+    }
+
+    private Vec3 averageCellCenter(HexCell cell) {
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        for (int index : cell.ix) {
+            Vec3 point = mesh.points.get(index);
+            x += point.x;
+            y += point.y;
+            z += point.z;
+        }
+        return new Vec3(x / cell.ix.length, y / cell.ix.length, z / cell.ix.length);
+    }
+
+    private void centerCellOnScreen(HexCell cell) {
+        Vec3 center = averageCellCenter(cell);
+        double length = Math.sqrt((center.x * center.x) + (center.y * center.y) + (center.z * center.z));
+        if (length <= 0.0) {
+            return;
+        }
+
+        double nx = center.x / length;
+        double ny = center.y / length;
+        double nz = center.z / length;
+
+        double targetY = Math.atan2(-nx, nz);
+        double z1 = Math.sqrt((nx * nx) + (nz * nz));
+        double targetX = Math.atan2(ny, z1);
+
+        animY = Math.toDegrees(targetY);
+        animX = Math.toDegrees(targetX);
     }
 
     private record Face2D(double[] x, double[] y, double z, HexCell cell) {}
