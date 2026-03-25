@@ -11,7 +11,6 @@ import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.input.KeyCode;
 import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
@@ -35,7 +34,9 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
-    private static final double MINIMAP_ZOOM = 1.08;
+    private static final double MINIMAP_ZOOM = 1.18;
+    private static final double MINIMAP_HALF_LONGITUDE_SPAN = Math.toRadians(95.0);
+    private static final double MINIMAP_HALF_SIN_LATITUDE_SPAN = 0.82;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -75,7 +76,6 @@ public class Main extends Application {
         selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
         minimapCanvas.setWidth(256);
         minimapCanvas.setHeight(140);
-        minimapCanvas.setOnMouseClicked(this::handleMinimapClick);
 
         Button toggleGridButton = new Button("Mostrar grade");
         toggleGridButton.setMaxWidth(Double.MAX_VALUE);
@@ -374,8 +374,12 @@ public class Main extends Application {
         g.strokeLine(w / 2.0, 0, w / 2.0, h);
         g.strokeLine((w * 3.0) / 4.0, 0, (w * 3.0) / 4.0, h);
 
+        GeoPoint minimapCenter = getMinimapCenter();
         for (HexCell cell : mesh.cells) {
-            Vec3 projected = projectCellToEquirectangular(cell, w, h);
+            Vec3 projected = projectCellToMovingMinimap(cell, w, h, minimapCenter.longitude, minimapCenter.latitude);
+            if (projected.x < -3.0 || projected.x > w + 3.0 || projected.y < -3.0 || projected.y > h + 3.0) {
+                continue;
+            }
             Color fill = cell.revealed ? cell.predefinedColor : Color.rgb(22, 22, 22);
             g.setFill(fill);
             g.fillOval(projected.x - 1.4, projected.y - 1.4, 2.8, 2.8);
@@ -383,7 +387,7 @@ public class Main extends Application {
 
         if (selectedCellId != null && selectedCellId >= 0 && selectedCellId < mesh.cells.size()) {
             HexCell selectedCell = mesh.cells.get(selectedCellId);
-            Vec3 selectedPoint = projectCellToEquirectangular(selectedCell, w, h);
+            Vec3 selectedPoint = projectCellToMovingMinimap(selectedCell, w, h, minimapCenter.longitude, minimapCenter.latitude);
 
             g.setFill(Color.rgb(255, 210, 0));
             g.fillOval(selectedPoint.x - 4.5, selectedPoint.y - 4.5, 9.0, 9.0);
@@ -393,55 +397,48 @@ public class Main extends Application {
         }
     }
 
-    private void handleMinimapClick(MouseEvent event) {
-        HexCell nearest = findNearestCellOnMap(event.getX(), event.getY(), minimapCanvas.getWidth(), minimapCanvas.getHeight());
-        if (nearest == null) {
-            return;
+    private GeoPoint getMinimapCenter() {
+        if (selectedCellId != null && selectedCellId >= 0 && selectedCellId < mesh.cells.size()) {
+            return getGeoPoint(mesh.cells.get(selectedCellId));
         }
-
-        selectedCellId = nearest.id;
-        nearest.revealed = true;
-        String neighbors = nearest.neighbors.stream()
-                .sorted()
-                .map(String::valueOf)
-                .collect(Collectors.joining(", "));
-        selectedInfoLabel.setText(
-                "ID: " + nearest.id
-                        + "\nVizinhos: " + neighbors
-                        + "\nSelecionado pelo mapa plano."
-        );
-        drawMinimap();
+        Vec3 cameraCenterOnSphere = rotate(new Vec3(0.0, 0.0, 1.0), -animX, -animY);
+        return toGeoPoint(cameraCenterOnSphere);
     }
 
-    private HexCell findNearestCellOnMap(double x, double y, double w, double h) {
-        HexCell nearest = null;
-        double minDistanceSquared = Double.MAX_VALUE;
-        for (HexCell cell : mesh.cells) {
-            Vec3 mapPoint = projectCellToEquirectangular(cell, w, h);
-            double dx = mapPoint.x - x;
-            double dy = mapPoint.y - y;
-            double distanceSquared = (dx * dx) + (dy * dy);
-            if (distanceSquared < minDistanceSquared) {
-                minDistanceSquared = distanceSquared;
-                nearest = cell;
-            }
-        }
-        return nearest;
-    }
+    private Vec3 projectCellToMovingMinimap(HexCell cell, double width, double height, double centerLongitude, double centerLatitude) {
+        GeoPoint point = getGeoPoint(cell);
+        double deltaLongitude = wrapRadians(point.longitude - centerLongitude);
+        double latitudeProjection = Math.sin(point.latitude) - Math.sin(centerLatitude);
+        double normalizedX = deltaLongitude / MINIMAP_HALF_LONGITUDE_SPAN;
+        double normalizedY = latitudeProjection / MINIMAP_HALF_SIN_LATITUDE_SPAN;
 
-    private Vec3 projectCellToEquirectangular(HexCell cell, double width, double height) {
-        Vec3 center = averageCellCenter(cell);
-        double length = Math.sqrt((center.x * center.x) + (center.y * center.y) + (center.z * center.z));
-        if (length > 0) {
-            center = new Vec3(center.x / length, center.y / length, center.z / length);
-        }
-
-        double longitude = Math.atan2(center.z, center.x);
-        double latitude = Math.asin(clamp(center.y, -1.0, 1.0));
-
-        double mapX = ((longitude + Math.PI) / (2.0 * Math.PI)) * width;
-        double mapY = ((Math.PI / 2.0 - latitude) / Math.PI) * height;
+        double mapX = (width * 0.5) + (normalizedX * (width * 0.5) * MINIMAP_ZOOM);
+        double mapY = (height * 0.5) - (normalizedY * (height * 0.5) * MINIMAP_ZOOM);
         return new Vec3(mapX, mapY, 0.0);
+    }
+
+    private GeoPoint getGeoPoint(HexCell cell) {
+        return toGeoPoint(averageCellCenter(cell));
+    }
+
+    private GeoPoint toGeoPoint(Vec3 point) {
+        double length = Math.sqrt((point.x * point.x) + (point.y * point.y) + (point.z * point.z));
+        if (length > 0) {
+            point = new Vec3(point.x / length, point.y / length, point.z / length);
+        }
+        double longitude = Math.atan2(point.z, point.x);
+        double latitude = Math.asin(clamp(point.y, -1.0, 1.0));
+        return new GeoPoint(longitude, latitude);
+    }
+
+    private static double wrapRadians(double angle) {
+        while (angle > Math.PI) {
+            angle -= Math.PI * 2.0;
+        }
+        while (angle < -Math.PI) {
+            angle += Math.PI * 2.0;
+        }
+        return angle;
     }
 
     private Vec3 averageCellCenter(HexCell cell) {
@@ -458,6 +455,7 @@ public class Main extends Application {
     }
 
     private record Face2D(double[] x, double[] y, double z, HexCell cell) {}
+    private record GeoPoint(double longitude, double latitude) {}
 
     public static void main(String[] args) {
         launch(args);
