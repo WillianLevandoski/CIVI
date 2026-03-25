@@ -34,9 +34,9 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
-    private static final double MINIMAP_ZOOM = 1.18;
-    private static final double MINIMAP_HALF_LONGITUDE_SPAN = Math.toRadians(95.0);
-    private static final double MINIMAP_HALF_SIN_LATITUDE_SPAN = 0.82;
+    private static final double MINIMAP_ZOOM = 1.04;
+    private static final double MINIMAP_MAX_MERCATOR_LATITUDE = Math.toRadians(82.0);
+    private static final double MINIMAP_HALF_MERCATOR_SPAN = 2.25;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -377,23 +377,13 @@ public class Main extends Application {
         GeoPoint minimapCenter = getMinimapCenter();
         for (HexCell cell : mesh.cells) {
             Vec3 projected = projectCellToMovingMinimap(cell, w, h, minimapCenter.longitude, minimapCenter.latitude);
-            if (projected.x < -3.0 || projected.x > w + 3.0 || projected.y < -3.0 || projected.y > h + 3.0) {
-                continue;
-            }
-            Color fill = cell.revealed ? cell.predefinedColor : Color.rgb(22, 22, 22);
-            g.setFill(fill);
-            g.fillOval(projected.x - 1.4, projected.y - 1.4, 2.8, 2.8);
+            drawMinimapPoint(g, projected, cell.revealed ? cell.predefinedColor : Color.rgb(22, 22, 22), w, h, 1.4);
         }
 
         if (selectedCellId != null && selectedCellId >= 0 && selectedCellId < mesh.cells.size()) {
             HexCell selectedCell = mesh.cells.get(selectedCellId);
             Vec3 selectedPoint = projectCellToMovingMinimap(selectedCell, w, h, minimapCenter.longitude, minimapCenter.latitude);
-
-            g.setFill(Color.rgb(255, 210, 0));
-            g.fillOval(selectedPoint.x - 4.5, selectedPoint.y - 4.5, 9.0, 9.0);
-            g.setStroke(Color.BLACK);
-            g.setLineWidth(1.2);
-            g.strokeOval(selectedPoint.x - 4.5, selectedPoint.y - 4.5, 9.0, 9.0);
+            drawSelectedMinimapPoint(g, selectedPoint, w, h);
         }
     }
 
@@ -407,14 +397,55 @@ public class Main extends Application {
 
     private Vec3 projectCellToMovingMinimap(HexCell cell, double width, double height, double centerLongitude, double centerLatitude) {
         GeoPoint point = getGeoPoint(cell);
-        double deltaLongitude = wrapRadians(point.longitude - centerLongitude);
-        double latitudeProjection = Math.sin(point.latitude) - Math.sin(centerLatitude);
-        double normalizedX = deltaLongitude / MINIMAP_HALF_LONGITUDE_SPAN;
-        double normalizedY = latitudeProjection / MINIMAP_HALF_SIN_LATITUDE_SPAN;
 
-        double mapX = (width * 0.5) + (normalizedX * (width * 0.5) * MINIMAP_ZOOM);
+        // Eixo X dinâmico com wrap total de 360° para manter a continuidade nas extremidades.
+        double normalizedX = (wrapRadians(point.longitude - centerLongitude) / (Math.PI * 2.0)) + 0.5;
+
+        // Projeção de Mercator relativa ao centro atual para melhorar percepção de latitude.
+        double centerMercator = mercatorLatitude(centerLatitude);
+        double pointMercator = mercatorLatitude(point.latitude);
+        double normalizedY = (pointMercator - centerMercator) / MINIMAP_HALF_MERCATOR_SPAN;
+
+        double mapX = normalizedX * width;
         double mapY = (height * 0.5) - (normalizedY * (height * 0.5) * MINIMAP_ZOOM);
         return new Vec3(mapX, mapY, 0.0);
+    }
+
+    private void drawMinimapPoint(GraphicsContext g, Vec3 point, Color fill, double width, double height, double radius) {
+        drawMinimapPointAt(g, point.x, point.y, fill, width, height, radius);
+        if (point.x < radius) {
+            drawMinimapPointAt(g, point.x + width, point.y, fill, width, height, radius);
+        } else if (point.x > width - radius) {
+            drawMinimapPointAt(g, point.x - width, point.y, fill, width, height, radius);
+        }
+    }
+
+    private void drawSelectedMinimapPoint(GraphicsContext g, Vec3 point, double width, double height) {
+        drawSelectedMinimapPointAt(g, point.x, point.y, width, height);
+        if (point.x < 4.5) {
+            drawSelectedMinimapPointAt(g, point.x + width, point.y, width, height);
+        } else if (point.x > width - 4.5) {
+            drawSelectedMinimapPointAt(g, point.x - width, point.y, width, height);
+        }
+    }
+
+    private void drawSelectedMinimapPointAt(GraphicsContext g, double x, double y, double width, double height) {
+        if (y < -6.0 || y > height + 6.0 || x < -6.0 || x > width + 6.0) {
+            return;
+        }
+        g.setFill(Color.rgb(255, 210, 0));
+        g.fillOval(x - 4.5, y - 4.5, 9.0, 9.0);
+        g.setStroke(Color.BLACK);
+        g.setLineWidth(1.2);
+        g.strokeOval(x - 4.5, y - 4.5, 9.0, 9.0);
+    }
+
+    private void drawMinimapPointAt(GraphicsContext g, double x, double y, Color fill, double width, double height, double radius) {
+        if (y < -3.0 || y > height + 3.0 || x < -3.0 || x > width + 3.0) {
+            return;
+        }
+        g.setFill(fill);
+        g.fillOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
     }
 
     private GeoPoint getGeoPoint(HexCell cell) {
@@ -429,6 +460,11 @@ public class Main extends Application {
         double longitude = Math.atan2(point.z, point.x);
         double latitude = Math.asin(clamp(point.y, -1.0, 1.0));
         return new GeoPoint(longitude, latitude);
+    }
+
+    private static double mercatorLatitude(double latitudeRadians) {
+        double clampedLatitude = clamp(latitudeRadians, -MINIMAP_MAX_MERCATOR_LATITUDE, MINIMAP_MAX_MERCATOR_LATITUDE);
+        return Math.log(Math.tan((Math.PI * 0.25) + (clampedLatitude * 0.5)));
     }
 
     private static double wrapRadians(double angle) {
