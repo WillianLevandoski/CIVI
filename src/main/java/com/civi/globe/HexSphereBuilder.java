@@ -3,8 +3,10 @@ package com.civi.globe;
 import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 final class HexSphereBuilder {
@@ -30,7 +32,7 @@ final class HexSphereBuilder {
         int b0 = n;
 
         HexCell h = new HexCell();
-        h.color = Color.rgb(0, 64, 128);
+        h.predefinedColor = Color.rgb(0, 64, 128);
 
         for (int b = 1; b < n - 1; b++) {
             for (int a = 1; a < b; a++) {
@@ -64,7 +66,7 @@ final class HexSphereBuilder {
             q.y = len * Math.sin(ang);
         }
 
-        h.color = Color.rgb(0, 64, 64);
+        h.predefinedColor = Color.rgb(0, 64, 64);
         for (int sector = 1; sector < 5; sector++) {
             double ang = sector * 72.0 * DEG;
             for (int i = 0; i < firstTriangleCount; i++) {
@@ -98,7 +100,7 @@ final class HexSphereBuilder {
             }
             h.a = ph.a;
             h.b = -ph.b;
-            h.color = ph.color;
+            h.predefinedColor = ph.predefinedColor;
             cells.add(copyCell(h));
         }
 
@@ -111,7 +113,7 @@ final class HexSphereBuilder {
             ab[ph.a][b0 + ph.b] = i;
         }
 
-        h.color = Color.rgb(0, 128, 64);
+        h.predefinedColor = Color.rgb(0, 128, 64);
         for (int a = 0; a < na; a++) {
             h.a = a;
             h.b = 0;
@@ -133,7 +135,7 @@ final class HexSphereBuilder {
             }
         }
 
-        h.color = Color.rgb(64, 128, 0);
+        h.predefinedColor = Color.rgb(64, 128, 0);
         for (int a = 0; a < na; a += n - 2) {
             for (int b = 1; b < n - 3; b++) {
                 for (int sign : new int[]{1, -1}) {
@@ -165,10 +167,10 @@ final class HexSphereBuilder {
 
         HexCell h0 = new HexCell();
         HexCell h1 = new HexCell();
-        h0.color = Color.rgb(128, 0, 0);
+        h0.predefinedColor = Color.rgb(128, 0, 0);
         h0.a = 0;
         h0.b = n - 1;
-        h1.color = h0.color;
+        h1.predefinedColor = h0.predefinedColor;
         h1.a = h0.a;
         h1.b = -h0.b;
         double pz = Math.sqrt((r * r) - (sz * sz));
@@ -183,7 +185,7 @@ final class HexSphereBuilder {
         cells.add(h0);
         cells.add(h1);
 
-        h.color = Color.rgb(96, 0, 96);
+        h.predefinedColor = Color.rgb(96, 0, 96);
         int[] ii = new int[5];
         HexCell[] poles = new HexCell[]{h0, h1};
         int hb = n - 2;
@@ -233,7 +235,7 @@ final class HexSphereBuilder {
                 continue;
             }
 
-            h.color = Color.rgb(128, 128, 0);
+            h.predefinedColor = Color.rgb(128, 128, 0);
             h.a = sectorBase;
             h.b = 0;
             h.ix[0] = cells.get(ii[0]).ix[0];
@@ -252,7 +254,7 @@ final class HexSphereBuilder {
             h.ix[5] = i1;
             cells.add(copyCell(h));
 
-            h.color = Color.rgb(160, 64, 0);
+            h.predefinedColor = Color.rgb(160, 64, 0);
             h.ix[0] = cells.get(ii[0]).ix[0];
             h.ix[1] = cells.get(ii[0]).ix[5];
             h.ix[2] = cells.get(ii[2]).ix[3];
@@ -273,8 +275,18 @@ final class HexSphereBuilder {
         enforceHexOnlyCells();
         assignIdsAndNeighbors();
 
-        for (HexCell cell : cells) {
-            cell.color = Color.BLACK;
+        applyPredefinedColors(0.65, Color.DODGERBLUE, Color.GOLD);
+    }
+
+    void applyPredefinedColors(double primaryRatio, Color primaryColor, Color secondaryColor) {
+        List<HexCell> shuffledCells = new ArrayList<>(cells);
+        Collections.shuffle(shuffledCells, new Random());
+
+        int primaryCount = (int) Math.round(shuffledCells.size() * primaryRatio);
+        for (int i = 0; i < shuffledCells.size(); i++) {
+            HexCell cell = shuffledCells.get(i);
+            cell.predefinedColor = i < primaryCount ? primaryColor : secondaryColor;
+            cell.revealed = false;
         }
     }
 
@@ -312,7 +324,7 @@ final class HexSphereBuilder {
         dst.id = src.id;
         dst.a = src.a;
         dst.b = src.b;
-        dst.color = src.color;
+        dst.predefinedColor = src.predefinedColor;
         System.arraycopy(src.ix, 0, dst.ix, 0, src.ix.length);
         return dst;
     }
