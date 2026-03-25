@@ -20,7 +20,7 @@ final class TerrainGenerator {
         assignBaseTerrainWithNoise(cells, points);
         smoothTerrain(cells, config.getSmoothingIterations());
         applyBiomeAffinityPlaceholder(cells);
-        applyCellColors(cells);
+        applyCellColors(cells, points);
     }
 
     private void assignBaseTerrainWithNoise(List<HexCell> cells, PointTable points) {
@@ -62,11 +62,17 @@ final class TerrainGenerator {
         int waterNeighbors = neighborCount.getOrDefault(TerrainType.WATER, 0);
         int landNeighbors = neighborCount.getOrDefault(TerrainType.LAND, 0);
 
-        if (waterNeighbors >= 4) {
+        if (landNeighbors >= 3) {
+            return TerrainType.LAND;
+        }
+        if (waterNeighbors >= 5) {
             return TerrainType.WATER;
         }
-        if (landNeighbors >= 4) {
+        if (landNeighbors > waterNeighbors) {
             return TerrainType.LAND;
+        }
+        if (waterNeighbors > landNeighbors) {
+            return TerrainType.WATER;
         }
         return cell.terrainType;
     }
@@ -93,10 +99,33 @@ final class TerrainGenerator {
         }
     }
 
-    private void applyCellColors(List<HexCell> cells) {
+    private void applyCellColors(List<HexCell> cells, PointTable points) {
+        List<CellScore> landCells = new ArrayList<>();
         for (HexCell cell : cells) {
-            cell.predefinedColor = cell.terrainType.getDisplayColor();
+            if (cell.terrainType == TerrainType.LAND) {
+                Vec3 center = calculateCellCenter(cell, points);
+                double vegetationScore = sampleVegetationNoise(center);
+                landCells.add(new CellScore(cell, vegetationScore));
+            }
+        }
+
+        landCells.sort(Comparator.comparingDouble(CellScore::score).reversed());
+        int greenLandTarget = landCells.size() / 2;
+        for (int i = 0; i < landCells.size(); i++) {
+            HexCell cell = landCells.get(i).cell();
+            if (i < greenLandTarget) {
+                cell.predefinedColor = TerrainType.LAND.getSecondaryDisplayColor();
+            } else {
+                cell.predefinedColor = TerrainType.LAND.getDisplayColor();
+            }
             cell.revealed = false;
+        }
+
+        for (HexCell cell : cells) {
+            if (cell.terrainType != TerrainType.LAND) {
+                cell.predefinedColor = cell.terrainType.getDisplayColor();
+                cell.revealed = false;
+            }
         }
     }
 
@@ -110,6 +139,18 @@ final class TerrainGenerator {
         double n3 = noise.noise2((lon - 5.0) * scale * 4.0, (lat + 19.0) * scale * 4.0);
 
         return (n1 * 0.60) + (n2 * 0.30) + (n3 * 0.10);
+    }
+
+
+    private double sampleVegetationNoise(Vec3 center) {
+        double lon = Math.atan2(center.y, center.x);
+        double lat = Math.atan2(center.z, Math.sqrt((center.x * center.x) + (center.y * center.y)));
+
+        double scale = config.getNoiseScale() * 1.5;
+        double n1 = noise.noise2((lon + 31.0) * scale, (lat - 17.0) * scale);
+        double n2 = noise.noise2((lon - 9.0) * scale * 2.0, (lat + 5.0) * scale * 2.0);
+
+        return (n1 * 0.65) + (n2 * 0.35);
     }
 
     private Vec3 calculateCellCenter(HexCell cell, PointTable points) {
