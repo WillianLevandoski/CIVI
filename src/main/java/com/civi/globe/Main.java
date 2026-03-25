@@ -37,6 +37,7 @@ public class Main extends Application {
     private static final double MINIMAP_ZOOM = 1.04;
     private static final double MINIMAP_MAX_MERCATOR_LATITUDE = Math.toRadians(82.0);
     private static final double MINIMAP_HALF_MERCATOR_SPAN = 2.25;
+    private static final double MINIMAP_DRAG_SENSITIVITY = 0.45;
 
     private double animX = 0.0;
     private double animY = 0.0;
@@ -60,6 +61,9 @@ public class Main extends Application {
     private final Image hexTexture = loadTexture("/textures/hex-tile.png");
     private boolean showColoredGrid = false;
     private Integer selectedCellId;
+    private double minimapLastMouseX = 0.0;
+    private double minimapLastMouseY = 0.0;
+    private boolean minimapDragging = false;
 
     @Override
     public void start(Stage stage) {
@@ -76,6 +80,28 @@ public class Main extends Application {
         selectedInfoLabel.setStyle("-fx-padding: 12; -fx-font-size: 14;");
         minimapCanvas.setWidth(256);
         minimapCanvas.setHeight(140);
+
+        minimapCanvas.setOnMousePressed(e -> {
+            minimapDragging = true;
+            minimapLastMouseX = e.getX();
+            minimapLastMouseY = e.getY();
+        });
+
+        minimapCanvas.setOnMouseReleased(e -> minimapDragging = false);
+
+        minimapCanvas.setOnMouseDragged(e -> {
+            if (!minimapDragging || selectedCellId != null) {
+                return;
+            }
+            double dx = e.getX() - minimapLastMouseX;
+            double dy = e.getY() - minimapLastMouseY;
+
+            animY -= dx * MINIMAP_DRAG_SENSITIVITY;
+            animX += dy * MINIMAP_DRAG_SENSITIVITY;
+
+            minimapLastMouseX = e.getX();
+            minimapLastMouseY = e.getY();
+        });
 
         Button toggleGridButton = new Button("Mostrar grade");
         toggleGridButton.setMaxWidth(Double.MAX_VALUE);
@@ -375,9 +401,9 @@ public class Main extends Application {
         g.strokeLine((w * 3.0) / 4.0, 0, (w * 3.0) / 4.0, h);
 
         GeoPoint minimapCenter = getMinimapCenter();
+
         for (HexCell cell : mesh.cells) {
-            Vec3 projected = projectCellToMovingMinimap(cell, w, h, minimapCenter.longitude, minimapCenter.latitude);
-            drawMinimapPoint(g, projected, cell.revealed ? cell.predefinedColor : Color.rgb(22, 22, 22), w, h, 1.4);
+            drawMinimapCell(g, cell, w, h, minimapCenter.longitude, minimapCenter.latitude, selectedCellId != null && selectedCellId == cell.id);
         }
 
         if (selectedCellId != null && selectedCellId >= 0 && selectedCellId < mesh.cells.size()) {
@@ -385,6 +411,78 @@ public class Main extends Application {
             Vec3 selectedPoint = projectCellToMovingMinimap(selectedCell, w, h, minimapCenter.longitude, minimapCenter.latitude);
             drawSelectedMinimapPoint(g, selectedPoint, w, h);
         }
+
+        g.setStroke(Color.rgb(200, 200, 200, 0.65));
+        g.setLineWidth(1.0);
+        g.strokeLine(w * 0.5, 0, w * 0.5, h);
+        g.strokeLine(0, h * 0.5, w, h * 0.5);
+    }
+
+    private void drawMinimapCell(GraphicsContext g, HexCell cell, double width, double height, double centerLongitude, double centerLatitude, boolean selected) {
+        double[] xs = new double[cell.ix.length];
+        double[] ys = new double[cell.ix.length];
+
+        for (int i = 0; i < cell.ix.length; i++) {
+            Vec3 point = mesh.points.get(cell.ix[i]);
+            GeoPoint geo = toGeoPoint(point);
+            Vec3 projected = projectGeoToMovingMinimap(geo, width, height, centerLongitude, centerLatitude);
+            xs[i] = projected.x;
+            ys[i] = projected.y;
+        }
+
+        double minX = xs[0];
+        double maxX = xs[0];
+        for (int i = 1; i < xs.length; i++) {
+            minX = Math.min(minX, xs[i]);
+            maxX = Math.max(maxX, xs[i]);
+        }
+
+        if ((maxX - minX) > width * 0.65) {
+            for (int i = 0; i < xs.length; i++) {
+                if (xs[i] < width * 0.5) {
+                    xs[i] += width;
+                }
+            }
+        }
+
+        Color fill = cell.revealed ? cell.predefinedColor : Color.rgb(26, 26, 26);
+        Color stroke = selected ? Color.rgb(255, 220, 90) : Color.rgb(50, 50, 50);
+        double strokeWidth = selected ? 1.25 : 0.45;
+
+        drawMinimapCellAt(g, xs, ys, fill, stroke, strokeWidth, width, height);
+        drawMinimapCellAt(g, shift(xs, -width), ys, fill, stroke, strokeWidth, width, height);
+        drawMinimapCellAt(g, shift(xs, width), ys, fill, stroke, strokeWidth, width, height);
+    }
+
+    private static double[] shift(double[] values, double offset) {
+        double[] out = new double[values.length];
+        for (int i = 0; i < values.length; i++) {
+            out[i] = values[i] + offset;
+        }
+        return out;
+    }
+
+    private void drawMinimapCellAt(GraphicsContext g, double[] xs, double[] ys, Color fill, Color stroke, double strokeWidth, double width, double height) {
+        double minX = xs[0];
+        double maxX = xs[0];
+        double minY = ys[0];
+        double maxY = ys[0];
+        for (int i = 1; i < xs.length; i++) {
+            minX = Math.min(minX, xs[i]);
+            maxX = Math.max(maxX, xs[i]);
+            minY = Math.min(minY, ys[i]);
+            maxY = Math.max(maxY, ys[i]);
+        }
+
+        if (maxX < -3 || minX > width + 3 || maxY < -3 || minY > height + 3) {
+            return;
+        }
+
+        g.setFill(fill);
+        g.fillPolygon(xs, ys, xs.length);
+        g.setStroke(stroke);
+        g.setLineWidth(strokeWidth);
+        g.strokePolygon(xs, ys, xs.length);
     }
 
     private GeoPoint getMinimapCenter() {
@@ -397,6 +495,10 @@ public class Main extends Application {
 
     private Vec3 projectCellToMovingMinimap(HexCell cell, double width, double height, double centerLongitude, double centerLatitude) {
         GeoPoint point = getGeoPoint(cell);
+        return projectGeoToMovingMinimap(point, width, height, centerLongitude, centerLatitude);
+    }
+
+    private Vec3 projectGeoToMovingMinimap(GeoPoint point, double width, double height, double centerLongitude, double centerLatitude) {
 
         // Eixo X dinâmico com wrap total de 360° para manter a continuidade nas extremidades.
         double normalizedX = (wrapRadians(point.longitude - centerLongitude) / (Math.PI * 2.0)) + 0.5;
@@ -409,15 +511,6 @@ public class Main extends Application {
         double mapX = normalizedX * width;
         double mapY = (height * 0.5) - (normalizedY * (height * 0.5) * MINIMAP_ZOOM);
         return new Vec3(mapX, mapY, 0.0);
-    }
-
-    private void drawMinimapPoint(GraphicsContext g, Vec3 point, Color fill, double width, double height, double radius) {
-        drawMinimapPointAt(g, point.x, point.y, fill, width, height, radius);
-        if (point.x < radius) {
-            drawMinimapPointAt(g, point.x + width, point.y, fill, width, height, radius);
-        } else if (point.x > width - radius) {
-            drawMinimapPointAt(g, point.x - width, point.y, fill, width, height, radius);
-        }
     }
 
     private void drawSelectedMinimapPoint(GraphicsContext g, Vec3 point, double width, double height) {
@@ -438,14 +531,6 @@ public class Main extends Application {
         g.setStroke(Color.BLACK);
         g.setLineWidth(1.2);
         g.strokeOval(x - 4.5, y - 4.5, 9.0, 9.0);
-    }
-
-    private void drawMinimapPointAt(GraphicsContext g, double x, double y, Color fill, double width, double height, double radius) {
-        if (y < -3.0 || y > height + 3.0 || x < -3.0 || x > width + 3.0) {
-            return;
-        }
-        g.setFill(fill);
-        g.fillOval(x - radius, y - radius, radius * 2.0, radius * 2.0);
     }
 
     private GeoPoint getGeoPoint(HexCell cell) {
