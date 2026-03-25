@@ -12,6 +12,7 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.geometry.Pos;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
@@ -31,7 +32,6 @@ public class Main extends Application {
     private static final int BASE_SUBDIVISIONS = 10; // configuração atual (1x)
     private static final int GLOBE_DETAIL_MULTIPLIER = 2; // altere aqui para aumentar/reduzir densidade
     private static final double KEYBOARD_ROTATION_SPEED = 0.5;
-    private static final double MOUSE_DRAG_SENSITIVITY = 0.50;
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
@@ -46,10 +46,6 @@ public class Main extends Application {
     private double dAnimX = 0.0;
     private double dAnimY = 0.0;
     private double zoom = INITIAL_ZOOM;
-
-    private double lastMouseX = 0.0;
-    private double lastMouseY = 0.0;
-    private boolean dragging = false;
 
     private boolean upPressed = false;
     private boolean downPressed = false;
@@ -140,29 +136,6 @@ public class Main extends Application {
         scene.setOnKeyPressed(e -> updateKeyboardRotation(e.getCode(), true));
         scene.setOnKeyReleased(e -> updateKeyboardRotation(e.getCode(), false));
 
-        canvas.setOnMousePressed(e -> {
-            dragging = true;
-            lastMouseX = e.getX();
-            lastMouseY = e.getY();
-        });
-
-        canvas.setOnMouseReleased(e -> dragging = false);
-
-        canvas.setOnMouseDragged(e -> {
-            if (!dragging) {
-                return;
-            }
-
-            double dx = e.getX() - lastMouseX;
-            double dy = e.getY() - lastMouseY;
-
-            animY += dx * MOUSE_DRAG_SENSITIVITY;
-            animX -= dy * MOUSE_DRAG_SENSITIVITY;
-
-            lastMouseX = e.getX();
-            lastMouseY = e.getY();
-        });
-
         canvas.setOnScroll(e -> {
             double direction = e.getDeltaY() > 0 ? 1.0 : -1.0;
             zoom += direction * ZOOM_SCROLL_STEP;
@@ -171,6 +144,9 @@ public class Main extends Application {
         });
 
         canvas.setOnMouseClicked(e -> {
+            if (e.getButton() != MouseButton.PRIMARY) {
+                return;
+            }
             HexCell clickedCell = findCellAt(e.getX(), e.getY());
             if (clickedCell == null) {
                 selectedInfoLabel.setText("Nenhum hexágono selecionado.");
