@@ -47,6 +47,11 @@ public class Main extends Application {
     private double dAnimY = 0.0;
     private double zoom = INITIAL_ZOOM;
 
+    private double lastMouseX = 0.0;
+    private double lastMouseY = 0.0;
+    private boolean dragging = false;
+    private boolean draggingWithSecondaryButton = false;
+
     private boolean upPressed = false;
     private boolean downPressed = false;
     private boolean leftPressed = false;
@@ -136,6 +141,35 @@ public class Main extends Application {
         scene.setOnKeyPressed(e -> updateKeyboardRotation(e.getCode(), true));
         scene.setOnKeyReleased(e -> updateKeyboardRotation(e.getCode(), false));
 
+        canvas.setOnMousePressed(e -> {
+            draggingWithSecondaryButton = e.getButton() == MouseButton.SECONDARY;
+            dragging = draggingWithSecondaryButton;
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+        });
+
+        canvas.setOnMouseReleased(e -> {
+            if (e.getButton() == MouseButton.SECONDARY) {
+                dragging = false;
+                draggingWithSecondaryButton = false;
+            }
+        });
+
+        canvas.setOnMouseDragged(e -> {
+            if (!dragging) {
+                return;
+            }
+
+            double dx = e.getX() - lastMouseX;
+            double dy = e.getY() - lastMouseY;
+
+            animY -= dx * MOUSE_DRAG_SENSITIVITY;
+            animX += dy * MOUSE_DRAG_SENSITIVITY;
+
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+        });
+
         canvas.setOnScroll(e -> {
             double direction = e.getDeltaY() > 0 ? 1.0 : -1.0;
             zoom += direction * ZOOM_SCROLL_STEP;
@@ -144,7 +178,7 @@ public class Main extends Application {
         });
 
         canvas.setOnMouseClicked(e -> {
-            if (e.getButton() != MouseButton.PRIMARY) {
+            if (e.getButton() != MouseButton.PRIMARY || draggingWithSecondaryButton) {
                 return;
             }
             HexCell clickedCell = findCellAt(e.getX(), e.getY());
