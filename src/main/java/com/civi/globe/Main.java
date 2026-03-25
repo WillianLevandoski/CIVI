@@ -57,10 +57,14 @@ public class Main extends Application {
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
     private final Image hexTexture = loadTexture("/textures/hex-tile.png");
     private boolean showColoredGrid = false;
+    private int northPoleId = -1;
+    private int southPoleId = -1;
 
     @Override
     public void start(Stage stage) {
         mesh.build(BASE_SUBDIVISIONS * GLOBE_DETAIL_MULTIPLIER, 1.5);
+        detectPoles();
+        paintPolesIfKnown();
 
         Canvas canvas = new Canvas(1100, 800);
         StackPane root = new StackPane(canvas);
@@ -79,12 +83,11 @@ public class Main extends Application {
             toggleGridButton.setText(showColoredGrid ? "Esconder grade" : "Mostrar grade");
         });
 
-        Button paintAllButton = new Button("Mostrar td");
+        Button paintAllButton = new Button("Mostrar tudo");
         paintAllButton.setMaxWidth(Double.MAX_VALUE);
         paintAllButton.setOnAction(e -> {
-            if (paintPolesIfKnown()) {
-                selectedInfoLabel.setText("Polos detectados e pintados de branco.");
-            }
+            int painted = paintAllUnpaintedCells();
+            selectedInfoLabel.setText("Células pintadas: " + painted + ". Polos permanecem brancos.");
         });
 
         Region spacer = new Region();
@@ -142,9 +145,12 @@ public class Main extends Application {
 
             for (Integer neighborId : clickedCell.neighbors) {
                 if (neighborId >= 0 && neighborId < mesh.cells.size()) {
-                    mesh.cells.get(neighborId).color = PERMANENT_NEIGHBOR_COLOR;
+                    if (neighborId != northPoleId && neighborId != southPoleId) {
+                        mesh.cells.get(neighborId).color = PERMANENT_NEIGHBOR_COLOR;
+                    }
                 }
             }
+            paintPolesIfKnown();
 
             String neighbors = clickedCell.neighbors.stream()
                     .sorted()
@@ -192,6 +198,7 @@ public class Main extends Application {
         g.fillRect(0, 0, w, h);
 
         List<Face2D> faces = new ArrayList<>();
+        paintPolesIfKnown();
         for (HexCell c : mesh.cells) {
             double[] xs = new double[6];
             double[] ys = new double[6];
@@ -229,9 +236,11 @@ public class Main extends Application {
         }
     }
 
-    private boolean paintPolesIfKnown() {
+    private void detectPoles() {
         if (mesh.cells.isEmpty() || mesh.points.size() == 0) {
-            return false;
+            northPoleId = -1;
+            southPoleId = -1;
+            return;
         }
 
         HexCell northPole = null;
@@ -256,13 +265,32 @@ public class Main extends Application {
             }
         }
 
-        if (northPole == null || southPole == null) {
+        northPoleId = northPole == null ? -1 : northPole.id;
+        southPoleId = southPole == null ? -1 : southPole.id;
+    }
+
+    private boolean paintPolesIfKnown() {
+        if (northPoleId < 0 || southPoleId < 0
+                || northPoleId >= mesh.cells.size() || southPoleId >= mesh.cells.size()) {
             return false;
         }
 
-        northPole.color = POLE_COLOR;
-        southPole.color = POLE_COLOR;
+        mesh.cells.get(northPoleId).color = POLE_COLOR;
+        mesh.cells.get(southPoleId).color = POLE_COLOR;
         return true;
+    }
+
+    private int paintAllUnpaintedCells() {
+        int paintedCount = 0;
+        for (HexCell cell : mesh.cells) {
+            if ((cell.id == northPoleId || cell.id == southPoleId) || !Color.BLACK.equals(cell.color)) {
+                continue;
+            }
+            cell.color = PERMANENT_NEIGHBOR_COLOR;
+            paintedCount++;
+        }
+        paintPolesIfKnown();
+        return paintedCount;
     }
 
     private HexCell findCellAt(double x, double y) {
