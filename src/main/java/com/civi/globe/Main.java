@@ -34,7 +34,7 @@ public class Main extends Application {
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
     private static final double MAX_ZOOM = 20.2;
-    private static final double MINIMAP_ZOOM = 1.04;
+    private static final double MINIMAP_ZOOM = 1.20;
     private static final double MINIMAP_MAX_MERCATOR_LATITUDE = Math.toRadians(82.0);
     private static final double MINIMAP_HALF_MERCATOR_SPAN = 2.25;
     private static final double MINIMAP_DRAG_SENSITIVITY = 0.45;
