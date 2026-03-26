@@ -2,6 +2,7 @@ package com.civi.globe;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 final class TerrainDistributionConfig {
     private final long seed;
@@ -20,7 +21,12 @@ final class TerrainDistributionConfig {
         EnumMap<TerrainType, Double> ratios = new EnumMap<>(TerrainType.class);
         ratios.put(TerrainType.WATER, TerrainType.WATER.getBaseChance());
         ratios.put(TerrainType.LAND, TerrainType.LAND.getBaseChance());
-        return new TerrainDistributionConfig(42841L, 3, ratios, 2.6);
+        return new TerrainDistributionConfig(
+                ThreadLocalRandom.current().nextLong(),
+                3,
+                ratios,
+                2.6
+        );
     }
 
     long getSeed() {

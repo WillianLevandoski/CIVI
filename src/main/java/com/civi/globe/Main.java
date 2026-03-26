@@ -137,11 +137,13 @@ public class Main extends Application {
 
         canvas.widthProperty().bind(root.widthProperty());
         canvas.heightProperty().bind(root.heightProperty());
+        canvas.setFocusTraversable(true);
 
         scene.setOnKeyPressed(e -> updateKeyboardRotation(e.getCode(), true));
         scene.setOnKeyReleased(e -> updateKeyboardRotation(e.getCode(), false));
 
         canvas.setOnMousePressed(e -> {
+            canvas.requestFocus();
             draggingWithSecondaryButton = e.getButton() == MouseButton.SECONDARY;
             dragging = draggingWithSecondaryButton;
             lastMouseX = e.getX();
@@ -178,6 +180,7 @@ public class Main extends Application {
         });
 
         canvas.setOnMouseClicked(e -> {
+            canvas.requestFocus();
             if (e.getButton() != MouseButton.PRIMARY || draggingWithSecondaryButton) {
                 return;
             }

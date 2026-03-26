@@ -134,11 +134,17 @@ final class TerrainGenerator {
         double lat = Math.atan2(center.z, Math.sqrt((center.x * center.x) + (center.y * center.y)));
 
         double scale = config.getNoiseScale();
-        double n1 = noise.noise2(lon * scale, lat * scale);
-        double n2 = noise.noise2((lon + 13.7) * scale * 2.0, (lat - 7.3) * scale * 2.0);
-        double n3 = noise.noise2((lon - 5.0) * scale * 4.0, (lat + 19.0) * scale * 4.0);
+        double warpX = noise.noise2((lon + 23.0) * scale * 0.7, (lat - 17.0) * scale * 0.7) * 0.55;
+        double warpY = noise.noise2((lon - 11.0) * scale * 0.7, (lat + 9.0) * scale * 0.7) * 0.55;
+        double warpedLon = lon + warpX;
+        double warpedLat = lat + warpY;
 
-        return (n1 * 0.60) + (n2 * 0.30) + (n3 * 0.10);
+        double macro = noise.noise2(warpedLon * scale * 0.75, warpedLat * scale * 0.75);
+        double n1 = noise.noise2((warpedLon + 13.7) * scale * 1.9, (warpedLat - 7.3) * scale * 1.9);
+        double n2 = noise.noise2((warpedLon - 5.0) * scale * 3.6, (warpedLat + 19.0) * scale * 3.6);
+        double coastBreak = noise.noise2((warpedLon + 41.0) * scale * 5.8, (warpedLat - 29.0) * scale * 5.8);
+
+        return (macro * 0.52) + (n1 * 0.26) + (n2 * 0.14) + (coastBreak * 0.08);
     }
 
 
