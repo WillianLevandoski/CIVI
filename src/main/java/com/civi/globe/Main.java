@@ -24,16 +24,13 @@ import javafx.stage.Stage;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class Main extends Application {
     private static final int BASE_SUBDIVISIONS = 10; // configuração atual (1x)
     private static final int GLOBE_DETAIL_MULTIPLIER = 3; // altere aqui para aumentar/reduzir densidade
-    private static final int HEX_TRIANGLE_SUBDIVISION = 3;
     private static final double KEYBOARD_ROTATION_SPEED = 0.5;
     private static final double ZOOM_SCROLL_STEP = 0.50;
     private static final double MIN_ZOOM = 2.50;
@@ -61,7 +58,6 @@ public class Main extends Application {
     private boolean rightPressed = false;
 
     private final HexSphereBuilder mesh = new HexSphereBuilder();
-    private final Map<Integer, List<HexSphereBuilder.SphericalTriangle>> cellTriangles = new HashMap<>();
     private final List<Face2D> renderedFaces = new ArrayList<>();
     private final Label zoomInfoLabel = new Label();
     private final Label selectedInfoLabel = new Label("Clique em um hexágono para ver o ID e os vizinhos.");
@@ -76,7 +72,6 @@ public class Main extends Application {
     @Override
     public void start(Stage stage) {
         mesh.build(BASE_SUBDIVISIONS * GLOBE_DETAIL_MULTIPLIER, 1.5);
-        rebuildTriangleCache(HEX_TRIANGLE_SUBDIVISION, new Vec3(0.0, 0.0, 0.0), 1.5);
 
         Canvas canvas = new Canvas(1100, 800);
         StackPane root = new StackPane(canvas);
@@ -278,60 +273,23 @@ public class Main extends Application {
         renderedFaces.clear();
         renderedFaces.addAll(faces);
         for (Face2D f : faces) {
-            List<Face2D> subdivisions = projectTriangles(f.cell, w, h);
-            if (subdivisions.isEmpty()) {
-                subdivisions = List.of(f);
-            }
-            for (Face2D triangle : subdivisions) {
-                if (!f.cell.revealed) {
-                    if (hexTexture != null) {
-                        drawTexturedPolygon(g, triangle.x, triangle.y, hexTexture);
-                    } else {
-                        g.setFill(Color.BLACK);
-                        g.fillPolygon(triangle.x, triangle.y, triangle.x.length);
-                    }
+            if (!f.cell.revealed) {
+                if (hexTexture != null) {
+                    drawTexturedPolygon(g, f.x, f.y, hexTexture);
                 } else {
-                    g.setFill(f.cell.predefinedColor);
-                    g.fillPolygon(triangle.x, triangle.y, triangle.x.length);
+                    g.setFill(Color.BLACK);
+                    g.fillPolygon(f.x, f.y, 6);
                 }
-                if (showColoredGrid) {
-                    g.setStroke(Color.WHITE);
-                    g.setLineWidth(0.0);
-                    g.strokePolygon(triangle.x, triangle.y, triangle.x.length);
-                }
+            } else {
+                g.setFill(f.cell.predefinedColor);
+                g.fillPolygon(f.x, f.y, 6);
+            }
+            if (showColoredGrid) {
+                g.setStroke(Color.WHITE);
+                g.setLineWidth(0.0);
+                g.strokePolygon(f.x, f.y, 6);
             }
         }
-    }
-
-    private void rebuildTriangleCache(int subdivision, Vec3 sphereCenter, double sphereRadius) {
-        cellTriangles.clear();
-        for (HexCell cell : mesh.cells) {
-            cellTriangles.put(cell.id, mesh.subdivideHexIntoEquilateralTriangles(cell, subdivision, sphereCenter, sphereRadius));
-        }
-    }
-
-    private List<Face2D> projectTriangles(HexCell cell, double width, double height) {
-        List<HexSphereBuilder.SphericalTriangle> triangles = cellTriangles.get(cell.id);
-        if (triangles == null || triangles.isEmpty()) {
-            return List.of();
-        }
-        List<Face2D> projected = new ArrayList<>(triangles.size());
-        for (HexSphereBuilder.SphericalTriangle triangle : triangles) {
-            Vec3[] vertices = new Vec3[]{triangle.a(), triangle.b(), triangle.c()};
-            double[] xs = new double[3];
-            double[] ys = new double[3];
-            double zAcc = 0.0;
-            for (int i = 0; i < 3; i++) {
-                Vec3 pr = rotate(vertices[i], animX, animY);
-                zAcc += pr.z;
-                double depth = pr.z + 5.0;
-                double k = (360.0 * zoom) / depth;
-                xs[i] = (pr.x * k) + (width * 0.5);
-                ys[i] = (-pr.y * k) + (height * 0.5);
-            }
-            projected.add(new Face2D(xs, ys, zAcc / 3.0, cell));
-        }
-        return projected;
     }
 
     private int revealAllHiddenCells() {
