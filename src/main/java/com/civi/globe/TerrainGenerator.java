@@ -6,8 +6,26 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javafx.scene.paint.Color;
 
 final class TerrainGenerator {
+    private static final List<BiomeBand> LAND_BIOMES = List.of(
+            new BiomeBand("Grassland", Color.web("#6DBE45"), 0.12),
+            new BiomeBand("Plains", Color.web("#8FCF5A"), 0.12),
+            new BiomeBand("Prairie", Color.web("#B7C94A"), 0.10),
+            new BiomeBand("Forest", Color.web("#2E7D32"), 0.12),
+            new BiomeBand("Jungle", Color.web("#0F6B3E"), 0.08),
+            new BiomeBand("Hills", Color.web("#8D7B4E"), 0.10),
+            new BiomeBand("Mountains", Color.web("#7A7A7A"), 0.08),
+            new BiomeBand("Swamp", Color.web("#4F7C4D"), 0.06),
+            new BiomeBand("Tundra", Color.web("#BFC8BE"), 0.07),
+            new BiomeBand("Arctic", Color.web("#E6F4F7"), 0.05),
+            new BiomeBand("Desert", Color.web("#D8BE8A"), 0.07),
+            new BiomeBand("Dead Lands", Color.web("#7A3E2F"), 0.03)
+    );
+    private static final Color COAST_COLOR = Color.web("#4A90D9");
+    private static final Color OCEAN_COLOR = Color.web("#1F4FA3");
+
     private final TerrainDistributionConfig config;
     private final OpenSimplex2D noise;
 
@@ -100,33 +118,60 @@ final class TerrainGenerator {
     }
 
     private void applyCellColors(List<HexCell> cells, PointTable points) {
-        List<CellScore> landCells = new ArrayList<>();
         for (HexCell cell : cells) {
+            Vec3 center = calculateCellCenter(cell, points);
             if (cell.terrainType == TerrainType.LAND) {
-                Vec3 center = calculateCellCenter(cell, points);
-                double vegetationScore = sampleVegetationNoise(center);
-                landCells.add(new CellScore(cell, vegetationScore));
-            }
-        }
-
-        landCells.sort(Comparator.comparingDouble(CellScore::score).reversed());
-        int greenLandTarget = landCells.size() / 2;
-        for (int i = 0; i < landCells.size(); i++) {
-            HexCell cell = landCells.get(i).cell();
-            if (i < greenLandTarget) {
-                cell.predefinedColor = TerrainType.LAND.getSecondaryDisplayColor();
+                if (isBorderingWater(cell, cells)) {
+                    cell.predefinedColor = COAST_COLOR;
+                } else {
+                    double biomeNoise = sampleVegetationNoise(center);
+                    cell.predefinedColor = pickLandBiomeColor(biomeNoise);
+                }
             } else {
-                cell.predefinedColor = TerrainType.LAND.getDisplayColor();
+                if (isBorderingLand(cell, cells)) {
+                    cell.predefinedColor = COAST_COLOR;
+                } else {
+                    cell.predefinedColor = OCEAN_COLOR;
+                }
             }
             cell.revealed = false;
         }
+    }
 
-        for (HexCell cell : cells) {
-            if (cell.terrainType != TerrainType.LAND) {
-                cell.predefinedColor = cell.terrainType.getDisplayColor();
-                cell.revealed = false;
+    private static boolean isBorderingWater(HexCell cell, List<HexCell> cells) {
+        for (Integer neighborId : cell.neighbors) {
+            if (neighborId < 0 || neighborId >= cells.size()) {
+                continue;
+            }
+            if (cells.get(neighborId).terrainType == TerrainType.WATER) {
+                return true;
             }
         }
+        return false;
+    }
+
+    private static boolean isBorderingLand(HexCell cell, List<HexCell> cells) {
+        for (Integer neighborId : cell.neighbors) {
+            if (neighborId < 0 || neighborId >= cells.size()) {
+                continue;
+            }
+            if (cells.get(neighborId).terrainType == TerrainType.LAND) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Color pickLandBiomeColor(double biomeNoise) {
+        double normalized = Math.max(0.0, Math.min(1.0, (biomeNoise + 1.0) * 0.5));
+        double cumulative = 0.0;
+        for (BiomeBand biome : LAND_BIOMES) {
+            cumulative += biome.weight();
+            if (normalized <= cumulative) {
+                return biome.color();
+            }
+        }
+        return LAND_BIOMES.get(LAND_BIOMES.size() - 1).color();
     }
 
     private double sampleTerrainNoise(Vec3 center) {
@@ -174,6 +219,7 @@ final class TerrainGenerator {
     }
 
     private record CellScore(HexCell cell, double score) {}
+    private record BiomeBand(String name, Color color, double weight) {}
 
     private static final class OpenSimplex2D {
         private static final double STRETCH_CONSTANT_2D = -0.211324865405187;
