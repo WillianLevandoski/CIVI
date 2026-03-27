@@ -12,6 +12,7 @@ final class HexCell {
     int a;
     int b;
     TerrainType terrainType = TerrainType.WATER;
+    String terrainName = "Ocean";
     Color predefinedColor;
     boolean revealed;
 }

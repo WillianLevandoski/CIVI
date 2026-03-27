@@ -303,6 +303,7 @@ final class HexSphereBuilder {
         dst.id = src.id;
         dst.a = src.a;
         dst.b = src.b;
+        dst.terrainName = src.terrainName;
         dst.predefinedColor = src.predefinedColor;
         System.arraycopy(src.ix, 0, dst.ix, 0, src.ix.length);
         return dst;

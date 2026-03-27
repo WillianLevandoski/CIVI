@@ -206,6 +206,7 @@ public class Main extends Application {
                     .collect(Collectors.joining(", "));
             selectedInfoLabel.setText(
                     "ID: " + clickedCell.id
+                            + "\nTipo: " + clickedCell.terrainName
                             + "\nVizinhos: " + neighbors
                             + "\nCélula clicada e vizinhos revelados: " + (clickedCell.neighbors.size() + 1)
             );
