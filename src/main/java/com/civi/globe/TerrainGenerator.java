@@ -8,12 +8,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
 import javafx.scene.paint.Color;
 
 final class TerrainGenerator {
-    private static final int ARCTIC_RING_RADIUS = 10;
     private static final List<BiomeBand> LAND_BIOMES = List.of(
             new BiomeBand("Grassland", Color.web("#6DBE45"), 0.12),
             new BiomeBand("Plains", Color.web("#8FCF5A"), 0.12),
@@ -24,10 +21,10 @@ final class TerrainGenerator {
             new BiomeBand("Mountains", Color.web("#7A7A7A"), 0.08),
             new BiomeBand("Swamp", Color.web("#4F7C4D"), 0.06),
             new BiomeBand("Tundra", Color.web("#BFC8BE"), 0.07),
+            new BiomeBand("Arctic", Color.web("#E6F4F7"), 0.05),
             new BiomeBand("Desert", Color.web("#D8BE8A"), 0.07),
             new BiomeBand("Dead Lands", Color.web("#7A3E2F"), 0.03)
     );
-    private static final Color ARCTIC_COLOR = Color.web("#E6F4F7");
     private static final Color COAST_COLOR = Color.web("#4A90D9");
     private static final Color OCEAN_COLOR = Color.web("#1F4FA3");
 
@@ -123,88 +120,23 @@ final class TerrainGenerator {
     }
 
     private void applyCellColors(List<HexCell> cells, PointTable points) {
-        Set<Integer> arcticCells = determineArcticCells(cells, points, ARCTIC_RING_RADIUS);
         for (HexCell cell : cells) {
             Vec3 center = calculateCellCenter(cell, points);
             if (cell.terrainType == TerrainType.LAND) {
-                if (arcticCells.contains(cell.id)) {
-                    cell.predefinedColor = ARCTIC_COLOR;
-                    cell.terrainName = "Arctic";
-                } else if (isBorderingWater(cell, cells)) {
+                if (isBorderingWater(cell, cells)) {
                     cell.predefinedColor = COAST_COLOR;
-                    cell.terrainName = "Coast";
                 } else {
                     double biomeNoise = sampleVegetationNoise(center);
-                    BiomeBand biome = pickLandBiome(biomeNoise);
-                    cell.predefinedColor = biome.color();
-                    cell.terrainName = biome.name();
+                    cell.predefinedColor = pickLandBiomeColor(biomeNoise);
                 }
             } else {
                 if (isBorderingLand(cell, cells)) {
                     cell.predefinedColor = COAST_COLOR;
-                    cell.terrainName = "Coast";
                 } else {
                     cell.predefinedColor = OCEAN_COLOR;
-                    cell.terrainName = "Ocean";
                 }
             }
             cell.revealed = false;
-        }
-    }
-
-    private Set<Integer> determineArcticCells(List<HexCell> cells, PointTable points, int radius) {
-        int northPoleId = -1;
-        int southPoleId = -1;
-        double maxZ = Double.NEGATIVE_INFINITY;
-        double minZ = Double.POSITIVE_INFINITY;
-
-        for (HexCell cell : cells) {
-            Vec3 center = calculateCellCenter(cell, points);
-            if (center.z > maxZ) {
-                maxZ = center.z;
-                northPoleId = cell.id;
-            }
-            if (center.z < minZ) {
-                minZ = center.z;
-                southPoleId = cell.id;
-            }
-        }
-
-        Set<Integer> arctic = new HashSet<>();
-        expandFromPole(cells, northPoleId, radius, arctic);
-        expandFromPole(cells, southPoleId, radius, arctic);
-        arctic.removeIf(id -> cells.get(id).terrainType != TerrainType.LAND);
-        return arctic;
-    }
-
-    private static void expandFromPole(List<HexCell> cells, int startId, int radius, Set<Integer> out) {
-        if (startId < 0 || startId >= cells.size()) {
-            return;
-        }
-
-        Queue<PoleStep> queue = new ArrayDeque<>();
-        Set<Integer> visited = new HashSet<>();
-        queue.add(new PoleStep(startId, 0));
-        visited.add(startId);
-
-        while (!queue.isEmpty()) {
-            PoleStep step = queue.poll();
-            if (step.distance() > radius) {
-                continue;
-            }
-
-            out.add(step.cellId());
-            if (step.distance() == radius) {
-                continue;
-            }
-
-            HexCell current = cells.get(step.cellId());
-            for (Integer neighborId : current.neighbors) {
-                if (neighborId < 0 || neighborId >= cells.size() || !visited.add(neighborId)) {
-                    continue;
-                }
-                queue.add(new PoleStep(neighborId, step.distance() + 1));
-            }
         }
     }
 
@@ -232,16 +164,16 @@ final class TerrainGenerator {
         return false;
     }
 
-    private static BiomeBand pickLandBiome(double biomeNoise) {
+    private static Color pickLandBiomeColor(double biomeNoise) {
         double normalized = Math.max(0.0, Math.min(1.0, (biomeNoise + 1.0) * 0.5));
         double cumulative = 0.0;
         for (BiomeBand biome : LAND_BIOMES) {
             cumulative += biome.weight();
             if (normalized <= cumulative) {
-                return biome;
+                return biome.color();
             }
         }
-        return LAND_BIOMES.get(LAND_BIOMES.size() - 1);
+        return LAND_BIOMES.get(LAND_BIOMES.size() - 1).color();
     }
 
     private double sampleTerrainNoise(Vec3 center) {
@@ -289,7 +221,6 @@ final class TerrainGenerator {
     }
 
     private record CellScore(HexCell cell, double score) {}
-    private record PoleStep(int cellId, int distance) {}
     private record BiomeBand(String name, Color color, double weight) {}
 
     private static final class OpenSimplex2D {
