@@ -1,13 +1,36 @@
 package com.civi.globe;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import javafx.scene.paint.Color;
 
 final class TerrainGenerator {
+    private static final int ARCTIC_RING_RADIUS = 10;
+    private static final List<BiomeBand> LAND_BIOMES = List.of(
+            new BiomeBand("Grassland", Color.web("#6DBE45"), 0.12),
+            new BiomeBand("Plains", Color.web("#8FCF5A"), 0.12),
+            new BiomeBand("Prairie", Color.web("#B7C94A"), 0.10),
+            new BiomeBand("Forest", Color.web("#2E7D32"), 0.12),
+            new BiomeBand("Jungle", Color.web("#0F6B3E"), 0.08),
+            new BiomeBand("Hills", Color.web("#8D7B4E"), 0.10),
+            new BiomeBand("Mountains", Color.web("#7A7A7A"), 0.08),
+            new BiomeBand("Swamp", Color.web("#4F7C4D"), 0.06),
+            new BiomeBand("Tundra", Color.web("#BFC8BE"), 0.07),
+            new BiomeBand("Desert", Color.web("#D8BE8A"), 0.07),
+            new BiomeBand("Dead Lands", Color.web("#7A3E2F"), 0.03)
+    );
+    private static final Color ARCTIC_COLOR = Color.web("#E6F4F7");
+    private static final Color COAST_COLOR = Color.web("#4A90D9");
+    private static final Color OCEAN_COLOR = Color.web("#1F4FA3");
+
     private final TerrainDistributionConfig config;
     private final OpenSimplex2D noise;
 
@@ -100,33 +123,125 @@ final class TerrainGenerator {
     }
 
     private void applyCellColors(List<HexCell> cells, PointTable points) {
-        List<CellScore> landCells = new ArrayList<>();
+        Set<Integer> arcticCells = determineArcticCells(cells, points, ARCTIC_RING_RADIUS);
         for (HexCell cell : cells) {
+            Vec3 center = calculateCellCenter(cell, points);
             if (cell.terrainType == TerrainType.LAND) {
-                Vec3 center = calculateCellCenter(cell, points);
-                double vegetationScore = sampleVegetationNoise(center);
-                landCells.add(new CellScore(cell, vegetationScore));
-            }
-        }
-
-        landCells.sort(Comparator.comparingDouble(CellScore::score).reversed());
-        int greenLandTarget = landCells.size() / 2;
-        for (int i = 0; i < landCells.size(); i++) {
-            HexCell cell = landCells.get(i).cell();
-            if (i < greenLandTarget) {
-                cell.predefinedColor = TerrainType.LAND.getSecondaryDisplayColor();
+                if (arcticCells.contains(cell.id)) {
+                    cell.predefinedColor = ARCTIC_COLOR;
+                    cell.terrainName = "Arctic";
+                } else if (isBorderingWater(cell, cells)) {
+                    cell.predefinedColor = COAST_COLOR;
+                    cell.terrainName = "Coast";
+                } else {
+                    double biomeNoise = sampleVegetationNoise(center);
+                    BiomeBand biome = pickLandBiome(biomeNoise);
+                    cell.predefinedColor = biome.color();
+                    cell.terrainName = biome.name();
+                }
             } else {
-                cell.predefinedColor = TerrainType.LAND.getDisplayColor();
+                if (isBorderingLand(cell, cells)) {
+                    cell.predefinedColor = COAST_COLOR;
+                    cell.terrainName = "Coast";
+                } else {
+                    cell.predefinedColor = OCEAN_COLOR;
+                    cell.terrainName = "Ocean";
+                }
             }
             cell.revealed = false;
         }
+    }
+
+    private Set<Integer> determineArcticCells(List<HexCell> cells, PointTable points, int radius) {
+        int northPoleId = -1;
+        int southPoleId = -1;
+        double maxZ = Double.NEGATIVE_INFINITY;
+        double minZ = Double.POSITIVE_INFINITY;
 
         for (HexCell cell : cells) {
-            if (cell.terrainType != TerrainType.LAND) {
-                cell.predefinedColor = cell.terrainType.getDisplayColor();
-                cell.revealed = false;
+            Vec3 center = calculateCellCenter(cell, points);
+            if (center.z > maxZ) {
+                maxZ = center.z;
+                northPoleId = cell.id;
+            }
+            if (center.z < minZ) {
+                minZ = center.z;
+                southPoleId = cell.id;
             }
         }
+
+        Set<Integer> arctic = new HashSet<>();
+        expandFromPole(cells, northPoleId, radius, arctic);
+        expandFromPole(cells, southPoleId, radius, arctic);
+        arctic.removeIf(id -> cells.get(id).terrainType != TerrainType.LAND);
+        return arctic;
+    }
+
+    private static void expandFromPole(List<HexCell> cells, int startId, int radius, Set<Integer> out) {
+        if (startId < 0 || startId >= cells.size()) {
+            return;
+        }
+
+        Queue<PoleStep> queue = new ArrayDeque<>();
+        Set<Integer> visited = new HashSet<>();
+        queue.add(new PoleStep(startId, 0));
+        visited.add(startId);
+
+        while (!queue.isEmpty()) {
+            PoleStep step = queue.poll();
+            if (step.distance() > radius) {
+                continue;
+            }
+
+            out.add(step.cellId());
+            if (step.distance() == radius) {
+                continue;
+            }
+
+            HexCell current = cells.get(step.cellId());
+            for (Integer neighborId : current.neighbors) {
+                if (neighborId < 0 || neighborId >= cells.size() || !visited.add(neighborId)) {
+                    continue;
+                }
+                queue.add(new PoleStep(neighborId, step.distance() + 1));
+            }
+        }
+    }
+
+    private static boolean isBorderingWater(HexCell cell, List<HexCell> cells) {
+        for (Integer neighborId : cell.neighbors) {
+            if (neighborId < 0 || neighborId >= cells.size()) {
+                continue;
+            }
+            if (cells.get(neighborId).terrainType == TerrainType.WATER) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isBorderingLand(HexCell cell, List<HexCell> cells) {
+        for (Integer neighborId : cell.neighbors) {
+            if (neighborId < 0 || neighborId >= cells.size()) {
+                continue;
+            }
+            if (cells.get(neighborId).terrainType == TerrainType.LAND) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static BiomeBand pickLandBiome(double biomeNoise) {
+        double normalized = Math.max(0.0, Math.min(1.0, (biomeNoise + 1.0) * 0.5));
+        double cumulative = 0.0;
+        for (BiomeBand biome : LAND_BIOMES) {
+            cumulative += biome.weight();
+            if (normalized <= cumulative) {
+                return biome;
+            }
+        }
+        return LAND_BIOMES.get(LAND_BIOMES.size() - 1);
     }
 
     private double sampleTerrainNoise(Vec3 center) {
@@ -174,6 +289,8 @@ final class TerrainGenerator {
     }
 
     private record CellScore(HexCell cell, double score) {}
+    private record PoleStep(int cellId, int distance) {}
+    private record BiomeBand(String name, Color color, double weight) {}
 
     private static final class OpenSimplex2D {
         private static final double STRETCH_CONSTANT_2D = -0.211324865405187;
